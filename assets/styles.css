@@ -390,18 +390,28 @@ body.pk-dragging .pk-dropzone { display: grid; }
 .pk-cn-power label { display: flex; gap: 6px; align-items: center; }
 .pk-cn-num { width: 64px; }
 .pk-cn-pins-in { width: 110px; }
-/* The build variant being checked (findings.js variantBar): "· <variant>" after the title, under it when narrow */
-/* Two columns, each a label over its text: the labels share a top line, the title and the variant a bottom one. */
-.pk-title-row { display: flex; flex-wrap: wrap; align-items: stretch; column-gap: 12px; row-gap: 6px; margin: 0 0 8px; }
-.pk-title-col, .pk-variant-col { min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
-.pk-variant-col .pk-variant { padding-bottom: 3px; }
-.pk-variant-col .eyebrow { padding-left: 23px; }
+/* The build variant being checked (findings.js head and variantBar): a grid with the labels on one row and the title,
+   the dot, and the variant on the next, sharing a baseline; the variant's label starts over its name. Narrow: one column. */
+.pk-title-row { display: grid; grid-template-columns: minmax(0, max-content) auto auto; grid-template-rows: auto auto; column-gap: 10px; align-items: baseline; justify-content: start; margin: 0 0 8px; }
 .pk-title-row .page-title { margin: 0; }
-.pk-variant { display: inline-flex; align-items: baseline; gap: 10px; font: 700 26px/1.12 var(--display); letter-spacing: -0.015em; color: var(--accent-ink, var(--accent)); white-space: nowrap; }
-.pk-variant-dot { color: var(--text-3); font-weight: 400; }
-.pk-variant-sel { font: inherit; color: inherit; letter-spacing: inherit; background: transparent; border: 0; border-radius: 6px; padding: 0 22px 0 4px; margin-left: -4px; cursor: pointer; appearance: none; -webkit-appearance: none;
+.pk-t-src { grid-column: 1; grid-row: 1; }
+.pk-t-name { grid-column: 1; grid-row: 2; }
+.pk-t-dot { grid-column: 2; grid-row: 2; font: 400 26px/1 var(--display); color: var(--text-3); }
+.pk-t-vlabel { grid-column: 3; grid-row: 1; }
+.pk-t-var { grid-column: 3; grid-row: 2; }
+.pk-variant { font: 700 26px/1.12 var(--display); letter-spacing: -0.015em; color: var(--accent); white-space: nowrap; }
+.pk-variant-sel { font: inherit; color: inherit; letter-spacing: inherit; background-color: transparent; border: 0; border-radius: 0; padding: 0 20px 0 0; margin: 0; cursor: pointer; appearance: none; -webkit-appearance: none;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: calc(100% - 11px) 55%, calc(100% - 5px) 55%; background-size: 6px 6px; background-repeat: no-repeat; }
-.pk-variant-sel:hover, .pk-variant-sel:focus-visible { background-color: var(--accent-soft); outline: none; }
-.pk-variant-sel option { font: 400 14px var(--sans, system-ui); color: var(--text); background: var(--surface, #fff); }
-@media (max-width: 860px) { .pk-variant-col { flex-basis: 100%; } .pk-variant-col .eyebrow { padding-left: 0; } .pk-variant { font-size: 20px; } .pk-variant-dot { display: none; } }
+  background-position: calc(100% - 9px) 58%, calc(100% - 3px) 58%; background-size: 6px 6px; background-repeat: no-repeat; }
+/* No filled box after a pick: an underline on hover and keyboard focus. */
+.pk-variant-sel:focus { outline: none; }
+.pk-variant-sel:hover, .pk-variant-sel:focus-visible { box-shadow: inset 0 -2px 0 currentColor; }
+/* The open list follows the theme (a light list with light text was unreadable in dark mode). */
+.pk-variant-sel option { font: 500 14px/1.4 var(--sans, system-ui); color: var(--text); background-color: var(--bg-elev); }
+@media (max-width: 860px) {
+  .pk-title-row { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .pk-t-src, .pk-t-name, .pk-t-vlabel, .pk-t-var { grid-column: 1; grid-row: auto; }
+  .pk-t-vlabel { margin-top: 8px; }
+  .pk-t-dot { display: none; }
+  .pk-variant { font-size: 20px; }
+}

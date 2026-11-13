@@ -15,7 +15,7 @@
 
   function head(d, sub) {
     const src = d.source === 'kicad' ? 'KiCad netlist' : d.netlist ? 'Altium schematic and Protel2 netlist' : d.source === 'altium' ? 'Altium schematic' : 'Schematic';
-    return '<div class="page-head"><div class="page-head-text"><div class="pk-title-row"><div class="pk-title-col"><div class="eyebrow">' + esc(src) + '</div><h1 class="page-title">' + esc(d.name) + '</h1></div>' + variantBar(d) + '</div><div class="page-sub">' + sub + '</div></div>' +
+    return '<div class="page-head"><div class="page-head-text"><div class="pk-title-row"><div class="eyebrow pk-t-src">' + esc(src) + '</div><h1 class="page-title pk-t-name">' + esc(d.name) + '</h1>' + variantBar(d) + '</div><div class="page-sub">' + sub + '</div></div>' +
       '<div class="pk-head-actions"><button class="btn" data-act="rerun" title="Run the checks again with the library as it is now">Run checks again</button></div></div>' + storedNote(d);
   }
   // A run reopened from Signoff EE (docs/send-to-signoff-ee.md): its findings as sent, not checked again.
@@ -40,7 +40,8 @@
       // A select is as wide as its longest option; this keeps the caret beside the chosen name.
       ? '<select class="pk-variant-sel" data-id="variant" aria-label="Build variant" style="width:calc(' + String(d.variant || 'No variant').length + ' * 0.6em + 30px)">' + vs.map(v => '<option value="' + esc(v.name) + '"' + (v.name === d.variant ? ' selected' : '') + '>' + esc(v.name) + '</option>').join('') + '<option value=""' + (!d.variant ? ' selected' : '') + '>No variant</option></select>'
       : '<span class="pk-variant-name">' + plural(off.length, 'part') + ' DNP</span>';
-    return '<div class="pk-variant-col" title="' + esc(tip) + '"><div class="eyebrow">Build variant</div><span class="pk-variant"><span class="pk-variant-dot" aria-hidden="true">·</span>' + inner + '</span></div>';
+    // Grid items of the title row (styles.css .pk-title-row): the dot in its own column, the label over the name.
+    return '<span class="pk-t-dot" aria-hidden="true">·</span><div class="eyebrow pk-t-vlabel">Build variant</div><span class="pk-variant pk-t-var" title="' + esc(tip) + '">' + inner + '</span>';
   }
   // ── Overview ──
   function overview(d, run, ctx) {
