@@ -791,43 +791,51 @@
     </net>
     <net code="20" name="/UART_TX">
       <node ref="U4" pin="30" pinfunction="PB6" pintype="bidirectional"/>
-      <node ref="U1" pin="30" pinfunction="RXD0" pintype="input"/>
+      <node ref="U1" pin="31" pinfunction="TXD0" pintype="output"/>
     </net>
     <net code="21" name="/UART_RX">
       <node ref="U4" pin="31" pinfunction="PB7" pintype="bidirectional"/>
-      <node ref="U1" pin="31" pinfunction="TXD0" pintype="output"/>
+      <node ref="U1" pin="30" pinfunction="RXD0" pintype="input"/>
     </net>
-    <net code="22" name="/CC1">
+    <net code="22" name="/DISP_INT">
+      <node ref="J2" pin="7" pinfunction="7" pintype="passive"/>
+      <node ref="U4" pin="11" pinfunction="PA4" pintype="bidirectional"/>
+    </net>
+    <net code="23" name="/TOUCH_INT">
+      <node ref="J2" pin="8" pinfunction="8" pintype="passive"/>
+      <node ref="U4" pin="28" pinfunction="PB4" pintype="bidirectional"/>
+    </net>
+    <net code="24" name="/CC1">
       <node ref="J3" pin="A5" pinfunction="CC1" pintype="bidirectional"/>
       <node ref="R14" pin="1" pinfunction="1" pintype="passive"/>
     </net>
-    <net code="23" name="/CC2">
+    <net code="25" name="/CC2">
       <node ref="J3" pin="B5" pinfunction="CC2" pintype="bidirectional"/>
       <node ref="R15" pin="1" pinfunction="1" pintype="passive"/>
     </net>
-    <net code="24" name="/LED_G">
+    <net code="26" name="/LED_G">
       <node ref="D3" pin="2" pinfunction="A" pintype="passive"/>
       <node ref="R16" pin="1" pinfunction="1" pintype="passive"/>
     </net>
-    <net code="25" name="/LED_R">
+    <net code="27" name="/LED_R">
       <node ref="D4" pin="2" pinfunction="A" pintype="passive"/>
       <node ref="R17" pin="1" pinfunction="1" pintype="passive"/>
     </net>
-    <net code="26" name="/LED_GA">
+    <net code="28" name="/LED_GA">
       <node ref="R16" pin="2" pinfunction="2" pintype="passive"/>
       <node ref="U4" pin="12" pinfunction="PA5" pintype="bidirectional"/>
     </net>
-    <net code="27" name="/LED_RA">
+    <net code="29" name="/LED_RA">
       <node ref="R17" pin="2" pinfunction="2" pintype="passive"/>
       <node ref="U4" pin="13" pinfunction="PA6" pintype="bidirectional"/>
     </net>
-    <net code="28" name="/NRST">
+    <net code="30" name="/NRST">
       <node ref="U4" pin="6" pinfunction="PF2-NRST" pintype="bidirectional"/>
     </net>
-    <net code="29" name="/SWDIO">
+    <net code="31" name="/SWDIO">
       <node ref="U4" pin="24" pinfunction="PA13" pintype="bidirectional"/>
     </net>
-    <net code="30" name="/SWCLK">
+    <net code="32" name="/SWCLK">
       <node ref="U4" pin="25" pinfunction="PA14-BOOT0" pintype="bidirectional"/>
     </net>
   </nets>

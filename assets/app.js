@@ -8,7 +8,8 @@
   const DEMO = /[?&]demo\b/.test(location.search);
   PK.DEMO = DEMO;
 
-  const state = { designs: [], active: null, view: 'home', lib: [], filter: 'ics', libQuery: '', busy: null, sync: { at: null, busy: false, error: '' } };
+  const state = { designs: [], active: null, view: 'home', tab: 'overview', lib: [], libGen: 0, filter: 'ics', libQuery: '', busy: null, sync: { at: null, busy: false, error: '' },
+    q: '', sev: { error: true, warn: true, info: true }, check: '', openFinding: null };
   const active = () => state.designs.find(d => d.id === state.active) || null;
 
   // ── Theme and sidebar: the suite's (same keys as Partcheck and Fabcheck) ──
@@ -72,7 +73,7 @@
       const d = await D.build(sch);
       if (!d.parts.length) throw new Error('No parts found in ' + sch.map(f => f.name).join(', '));
       d.id = 'd' + Date.now().toString(36);
-      state.designs.unshift(d); state.active = d.id; state.view = 'design';
+      state.designs.unshift(d); state.active = d.id; state.view = 'design'; state.tab = 'overview'; state.check = ''; state.q = ''; state.openFinding = null;
       if (d.notes.length) d.notes.forEach(n => console.info('Pincheck:', n));
     } catch (e) { toast(e.message, 'error'); state.view = active() ? 'design' : 'home'; }
     state.busy = null; renderAll();
@@ -95,7 +96,15 @@
     if (n) { toast('Added ' + n + ' part file' + (n === 1 ? '' : 's') + ' to the library'); await reloadLib(); scheduleSync(); }
   }
 
-  async function reloadLib() { state.lib = (await L.all()).filter(f => !f.local || !f.local.conflictOf || true); renderAll(); }
+  async function reloadLib() { state.lib = (await L.all()).filter(f => !f.local || !f.local.conflictOf); state.libGen++; renderAll(); }
+
+  // The checks run when a design opens and again whenever the library changes (assets/checks.js).
+  function ensureRun(d) {
+    if (d.run && d.runGen === state.libGen) return d.run;
+    try { d.run = PK.checks.run(d, state.lib); } catch (e) { console.error(e); toast('The checks stopped: ' + e.message, 'error'); d.run = { findings: [], rails: [], coverage: {}, parts: {}, ms: 0, hasNets: false }; }
+    d.runGen = state.libGen;
+    return d.run;
+  }
 
   // ── The library's sync with pincheck_data ──
   let syncTimer = null;
@@ -116,7 +125,18 @@
   }
 
   // ── Rendering ──
-  function renderAll() { renderSide(); renderToolbar(); renderView(); }
+  function renderAll() { renderSide(); renderToolbar(); renderTabs(); renderView(); }
+
+  // Overview, Findings, and Parts, as Fabcheck's toolbar tabs (the schematic view joins them later).
+  function renderTabs() {
+    const seg = $('#view-seg'), d = active();
+    if (state.view !== 'design' || !d || state.busy) { seg.hidden = true; return; }
+    const run = ensureRun(d), c = PK.pages.counts(run.findings);
+    const tabs = [['overview', 'Overview', ''], ['findings', 'Findings', c.error || c.warn ? '<span class="count">' + (c.error ? '✕ ' + c.error + ' ' : '') + (c.warn ? '▲ ' + c.warn : '') + '</span>' : ''], ['parts', 'Parts', '']];
+    if (PK.viewer && d.sheetsDrawn) tabs.splice(2, 0, ['schematic', 'Schematic', '']);
+    seg.hidden = false;
+    seg.innerHTML = tabs.map(([k, l, x]) => '<button role="tab" data-tab="' + k + '" class="' + (state.tab === k ? 'on' : '') + '">' + l + x + '</button>').join('');
+  }
 
   function renderSide() {
     $('#design-list').innerHTML = state.designs.length ? state.designs.map(d => {
@@ -149,7 +169,14 @@
     if (state.busy) { v.innerHTML = '<div class="page"><div class="card pk-busy"><div class="pk-spin"></div><div>' + esc(state.busy) + '</div></div></div>'; return; }
     if (state.view === 'library') { v.innerHTML = libraryPage(); return; }
     const d = active();
-    if (state.view === 'design' && d) { v.innerHTML = designPage(d); return; }
+    if (state.view === 'design' && d) {
+      const ctx = { lib: state.lib, state, hasSheets: !!d.sheetsDrawn };
+      if (state.tab === 'findings') v.innerHTML = PK.pages.findings(d, ensureRun(d), ctx);
+      else if (state.tab === 'parts') v.innerHTML = designPage(d);
+      else if (state.tab === 'schematic' && PK.viewer) PK.viewer.render(v, d, state);
+      else v.innerHTML = PK.pages.overview(d, ensureRun(d), ctx);
+      return;
+    }
     v.innerHTML = homePage();
   }
 
@@ -230,11 +257,17 @@
 
   // ── Events ──
   document.addEventListener('click', async e => {
-    const t = e.target.closest('[data-act],[data-design],[data-config],[data-filter],[data-edit],[data-alias]');
+    const t = e.target.closest('[data-act],[data-design],[data-config],[data-filter],[data-edit],[data-alias],[data-tab],[data-sev],[data-sevonly],[data-fopen],[data-openfile],[data-show]');
     if (!t) return;
     if (t.dataset.design) { state.active = t.dataset.design; state.view = 'design'; $('#app').classList.remove('nav-open'); renderAll(); return; }
     if (t.dataset.config) { configure(t.dataset.config); return; }
     if (t.dataset.filter) { state.filter = t.dataset.filter; renderView(); return; }
+    if (t.dataset.tab) { state.tab = t.dataset.tab; renderTabs(); renderView(); $('#main').scrollTop = 0; return; }
+    if (t.dataset.sev) { state.sev = Object.assign({}, state.sev, { [t.dataset.sev]: !state.sev[t.dataset.sev] }); renderView(); return; }
+    if (t.dataset.sevonly) { state.sev = { error: false, warn: false, info: false, [t.dataset.sevonly]: true }; state.tab = 'findings'; renderTabs(); renderView(); return; }
+    if (t.dataset.fopen) { state.openFinding = state.openFinding === t.dataset.fopen ? null : t.dataset.fopen; renderView(); return; }
+    if (t.dataset.show && PK.viewer) { const d = active(); const f = d && d.run && d.run.findings.find(x => x.id === t.dataset.show); if (f) { state.tab = 'schematic'; state.showFinding = f; renderTabs(); renderView(); } return; }
+    if (t.dataset.openfile) { const f = state.lib.find(x => x.id === t.dataset.openfile); const d = active(); const part = d && t.dataset.ref ? d.parts.find(p => p.ref === t.dataset.ref) : null; if (f) editPart(f, part, false); return; }
     if (t.dataset.edit) { const f = state.lib.find(x => x.id === t.dataset.edit); if (f) editPart(f, null, false); return; }
     if (t.dataset.alias) {
       const f = state.lib.find(x => x.id === t.dataset.alias);
@@ -249,11 +282,15 @@
     else if (a === 'library') { state.view = 'library'; $('#app').classList.remove('nav-open'); renderAll(); }
     else if (a === 'theme') { const t2 = isDark(readTheme()) ? 'light' : 'dark'; writeTheme(t2); applyTheme(t2); }
     else if (a === 'sync') syncNow();
+    else if (a === 'rerun') { const d = active(); if (d) { d.run = null; ensureRun(d); renderTabs(); renderView(); toast('Checked again: ' + d.run.findings.length + ' findings'); } }
     else if (a === 'import') PK.editor.pickJson((text, name) => importJson(text, name));
     else if (a === 'export-all') { const b = new Blob([JSON.stringify(state.lib.map(L.strip), null, 2) + '\n'], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = 'pincheck-library.json'; l.click(); setTimeout(() => URL.revokeObjectURL(l.href), 1500); }
     else if (a === 'new-part') { const mpn = prompt('Part number'); if (mpn && mpn.trim()) editPart({ schema: L.SCHEMA, id: L.slug(mpn), mpn: mpn.trim(), match: [], manufacturer: '', kind: 'ic', description: '', package: '', datasheet: {}, pins: [], domains: [], values: [], made: { by: who(), at: new Date().toISOString(), how: 'by hand' } }, null, true); }
   });
-  document.addEventListener('input', e => { if (e.target.dataset.id === 'lib-q') { state.libQuery = e.target.value; const pos = e.target.selectionStart; renderView(); const n = $('[data-id="lib-q"]'); n.focus(); n.setSelectionRange(pos, pos); } });
+  document.addEventListener('change', e => { if (e.target.dataset.id === 'fgroup') { state.check = e.target.value; renderView(); } });
+  document.addEventListener('input', e => {
+    if (e.target.dataset.id === 'fq') { state.q = e.target.value; const pos = e.target.selectionStart; renderView(); const n = $('[data-id="fq"]'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } return; }
+    if (e.target.dataset.id === 'lib-q') { state.libQuery = e.target.value; const pos = e.target.selectionStart; renderView(); const n = $('[data-id="lib-q"]'); n.focus(); n.setSelectionRange(pos, pos); } });
   $('#file-input').addEventListener('change', e => openFiles(e.target.files));
   let dragDepth = 0;
   window.addEventListener('dragenter', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { dragDepth++; document.body.classList.add('pk-dragging'); } });

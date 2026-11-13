@@ -18,7 +18,12 @@ the suite's hard rules.
   stored fab packages. Datasheets are in `C:\Dovetail\datasheets` (downloaded from the makers' sites at Chris's
   OK). Not filled (no official datasheet reached): ROHM LMR1901YG-M, 3PEAK TPT75176A, PUI SMT-0827-S-HT-R, and
   NDK MU00525; two crystal symbols name no part number (`WE-XTAL_CFPX-180`, `WE-XTAL_IQXC-42`).
-- Not built: the checks, zip drop. Altium nets come from the Protel2 netlist (`assets/protel.js`). See `docs/design.md`, *Not built yet*.
+- **Checks (2026-11-13, Chris: all of them, Fabcheck-style pages, no check matrix):** `assets/checks.js`
+  (23 checks in six groups, net voltages from regulators and dividers) and `assets/findings.js` (Overview,
+  Findings). Contract: `docs/checks.md`. Blind run on a real Altium project (local only) found reversed
+  gate supply pins, an open VBAT, a missing SMPS capacitor, wrong crystal load capacitors, and two RXD
+  outputs on one net. The schematic viewer is a separate, paused session.
+- Not built: the schematic viewer, zip drop. Altium nets come from the Protel2 netlist (`assets/protel.js`). See `docs/design.md`, *Not built yet*.
 
 ## Rules
 

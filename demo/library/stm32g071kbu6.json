@@ -95,7 +95,12 @@
       "num": "11",
       "name": "PA4",
       "role": "io",
-      "domain": "VDD"
+      "domain": "VDD",
+      "functions": [
+        "ADC1_IN4",
+        "SPI1_NSS AF0",
+        "EXTI4"
+      ]
     },
     {
       "num": "12",
@@ -216,7 +221,12 @@
       "num": "28",
       "name": "PB4",
       "role": "io",
-      "domain": "VDD"
+      "domain": "VDD",
+      "functions": [
+        "SPI1_MISO AF0",
+        "TIM3_CH1 AF1",
+        "EXTI4"
+      ]
     },
     {
       "num": "29",

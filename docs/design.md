@@ -77,7 +77,7 @@ From `docs/research/part-data-sources.md`:
 - **Passives** need no file: their part numbers decode to value, tolerance, voltage, and dielectric
   (Murata GRM, KEMET, Vishay CRCW verified; others to check). No offline DC-bias data was found.
 
-## Checks (next)
+## Checks (built 2026-11-13; details in `docs/checks.md`)
 
 In order, each needing only the netlist and part files:
 
@@ -102,7 +102,7 @@ unverified. Planted errors for the demo come with the checks.
 ## Not built yet
 
 - Nets derived from SchDoc files without a netlist (not planned while Protel2 works).
-- The checks.
+- The schematic viewer (a separate session Chris started paused, 2026-11-13).
 - A zip or folder drop (the project zip Chris sent; JSZip, as Partcheck loads it).
 - Microchip and IBIS importers; passive part-number decoding.
 - Sharing findings with Signoff EE, the way Fabcheck sends a run.

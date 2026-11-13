@@ -24,7 +24,7 @@
     ok(P.forKind('regulator').some(c => c.k === 'reg.vref') && !P.forKind('resistor').some(c => c.k === 'reg.vref'));
   });
   t('KiCad netlist: parts, pins, and nets', () => {
-    eq(design.source, 'kicad'); eq(design.parts.length, 39); eq(design.nets.length, 30);
+    eq(design.source, 'kicad'); eq(design.parts.length, 39); eq(design.nets.length, 32);
     const u4 = design.parts.find(p => p.ref === 'U4');
     eq(u4.pins.length, 33); eq(u4.pins.find(p => p.num === '4').name, 'VDD/VDDA'); eq(u4.pins.find(p => p.num === '4').type, 'power');
     eq(design.nets.find(n => n.name === '3V3').nodes.some(n => n.ref === 'U4' && n.pin === '4'), true);
@@ -115,6 +115,69 @@
       eq(d.parts.find(p => p.ref === 'U2.2').pins.some(p => p.num === '8' && p.unconnected), true);
       eq(D.groups(d, ['ic']).map(g => g.refs), [['U1'], ['U2.1', 'U2.2']]);
     } finally { PK.schdoc.parse = real; }
+  });
+  // ── Checks ──
+  const CK = PK.checks;
+  t('checks: expressions, net-name voltages, and passive values', () => {
+    eq(CK.evalExpr('min(VDD+0.4, 4.0)', { VDD: 3.3 }), 3.7); eq(+CK.evalExpr('0.7*VDD', { VDD: 3.3 }).toFixed(2), 2.31); eq(CK.evalExpr('(V+)+0.3', { 'V+': 5 }), 5.3);
+    eq(CK.evalExpr('VDD+0.3', {}), null); eq(CK.evalExpr(5.5, {}), 5.5);
+    eq(['3V3', '+5V0', 'VCC_1V8', '+12V', '5V0_ISO', '+3V3_AUX.1', '12V_SENSE0', 'PG_+3V3', '5V_MON', 'SDA'].map(CK.voltageFromName), [3.3, 5, 1.8, 12, 5, 3.3, null, null, null, null]);
+    const pv = (v, u, kind) => (CK.passiveValue({ kind, params: { Value: v } }, u) || {}).v;
+    eq([pv('10k', 'Ω', 'resistor'), pv('4K99', 'Ω', 'resistor'), pv('0R', 'Ω', 'resistor'), pv('33.2k', 'Ω', 'resistor'), pv('R_10k_0402', 'Ω', 'resistor')], [10000, 4990, 0, 33200, 10000]);
+    eq([pv('100nF', 'F', 'capacitor'), pv('C_100nF_0603_50V', 'F', 'capacitor'), pv('4u7', 'F', 'capacitor'), pv('2.2uH', 'H', 'inductor')], [1e-7, 4.7e-6, 4.7e-6, 2.2e-6].map((x, i) => i === 1 ? 1e-7 : x));
+  });
+  t('checks: the demo finds its planted errors and works out 3V3 from the divider', () => {
+    const r = CK.run(design, lib);
+    ok(r.findings.some(f => f.check === 'func.exti' && /DISP_INT/.test(f.title)), 'EXTI line 4 shared');
+    ok(r.findings.some(f => f.check === 'func.uart' && /TX\) meets U1 TXD0/.test(f.title)), 'TX to TX');
+    eq(r.findings.filter(f => f.severity === 'error').length, 0, 'no errors on the demo');
+    const v3 = r.rails.find(x => x.net === '3V3');
+    eq(+v3.v.toFixed(3), 3.318); ok(/R5, R6/.test(v3.from));
+    ok(!r.rails.some(x => x.net === 'SW'), 'the switch node has no DC voltage');
+  });
+  // A made-up board: a logic gate with its supply pins reversed, an LDO, and an MCU input pulled to 5 V.
+  const mini = (() => {
+    const pin = (num, name, type) => ({ num, name, type });
+    const parts = [
+      { ref: 'U1', mpn: 'GATE1', kind: 'ic', params: {}, pins: [pin('1', 'A', 'input'), pin('2', 'GND', 'power'), pin('3', 'Y', 'output'), pin('4', 'VCC', 'power')] },
+      { ref: 'U2', mpn: 'LDO33', kind: 'ic', params: {}, pins: [pin('1', 'IN', 'power'), pin('2', 'GND', 'power'), pin('3', 'OUT', 'power')] },
+      { ref: 'U3', mpn: 'MCU1', kind: 'ic', params: {}, pins: [pin('1', 'VDD', 'power'), pin('2', 'VSS', 'power'), pin('3', 'PA0', 'io'), pin('4', 'VBAT', 'power')] },
+      { ref: 'R1', mpn: '', kind: 'resistor', params: { Value: '10k' }, pins: [pin('1', '1', 'passive'), pin('2', '2', 'passive')] },
+      { ref: 'C1', mpn: '', kind: 'capacitor', params: { Value: '100nF' }, pins: [pin('1', '1', 'passive'), pin('2', '2', 'passive')] },
+    ];
+    const nets = [
+      { name: '+5V', nodes: [{ ref: 'U2', pin: '1' }, { ref: 'U1', pin: '2' }, { ref: 'R1', pin: '1' }] },
+      { name: 'GND', nodes: [{ ref: 'U2', pin: '2' }, { ref: 'U1', pin: '4' }, { ref: 'U3', pin: '2' }, { ref: 'C1', pin: '2' }] },
+      { name: 'NetU2_3', nodes: [{ ref: 'U2', pin: '3' }, { ref: 'U3', pin: '1' }, { ref: 'C1', pin: '1' }] },
+      { name: 'BTN', nodes: [{ ref: 'R1', pin: '2' }, { ref: 'U3', pin: '3' }] },
+    ];
+    const file = (mpn, kind, pins, values, domains) => ({ schema: 'pincheck.part/1', id: mpn.toLowerCase(), mpn, kind, match: [], pins, values, domains, datasheet: {} });
+    const lib2 = [
+      file('GATE1', 'logic', [{ num: '1', name: 'A', role: 'input', domain: 'VCC' }, { num: '2', name: 'GND', role: 'ground' }, { num: '3', name: 'Y', role: 'output', domain: 'VCC' }, { num: '4', name: 'VCC', role: 'power-in', domain: 'VCC' }],
+        [{ k: 'supply.range', on: 'VCC', min: 1.65, max: 5.5, unit: 'V', ok: { by: 't' } }], ['VCC']),
+      file('LDO33', 'regulator', [{ num: '1', name: 'IN', role: 'power-in', domain: 'IN' }, { num: '2', name: 'GND', role: 'ground' }, { num: '3', name: 'OUT', role: 'power-out' }],
+        [{ k: 'reg.vout', min: 3.25, typ: 3.3, max: 3.35, unit: 'V', ok: { by: 't' } }, { k: 'reg.cout', min: 1e-6, unit: 'F' }], ['IN']),
+      file('MCU1', 'mcu', [{ num: '1', name: 'VDD', role: 'power-in', domain: 'VDD' }, { num: '2', name: 'VSS', role: 'ground' }, { num: '3', name: 'PA0', role: 'io', domain: 'VDD' }, { num: '4', name: 'VBAT', role: 'power-in', domain: 'VBAT' }],
+        [{ k: 'supply.range', on: 'VDD', min: 1.7, max: 3.6, unit: 'V', ok: { by: 't' } }, { k: 'io.absmax', on: 'VDD', value: 'VDD+0.3', unit: 'V', ok: { by: 't' } }], ['VDD', 'VBAT']),
+    ];
+    return { design: { parts, nets, sheets: [], notes: [] }, lib: lib2 };
+  })();
+  t('checks: a made-up board with planted faults', () => {
+    const r = CK.run(mini.design, mini.lib);
+    const has = (check, re, sev) => r.findings.some(f => f.check === check && re.test(f.title) && (!sev || f.severity === sev));
+    ok(has('supply.ground', /U1 GND .* is on \+5V, not ground/, 'error'), 'reversed gate supply: GND on +5V');
+    ok(has('supply.range', /U1 VCC .* at 0 V/, 'error'), 'reversed gate supply: VCC on ground');
+    ok(has('supply.unpowered', /U3 VBAT .* not connected/, 'error'), 'VBAT open');
+    ok(has('io.absmax', /U3 PA0 .* sees 5 V, above its 3\.6 V/, 'error'), 'PA0 pulled to 5 V');
+    ok(has('parts.regulator', /U2 output has 100 nF, below the 1 µF minimum/, 'warn'), 'output capacitor below the minimum');
+    eq(+r.rails.find(x => x.net === 'NetU2_3').v.toFixed(2), 3.3, 'the LDO output net');
+    ok(!r.findings.some(f => f.check === 'supply.range' && /U3 VDD/.test(f.title)), 'U3 VDD at 3.3 V is fine');
+  });
+  t('checks: an unverified value turns an error into a warning that names it', () => {
+    const lib2 = JSON.parse(JSON.stringify(mini.lib));
+    delete lib2[2].values.find(v => v.k === 'io.absmax').ok;
+    const f = CK.run(mini.design, lib2).findings.find(x => x.check === 'io.absmax');
+    eq([f.severity, f.unverified], ['warn', true]); ok(/unverified MCU1 io\.absmax \(VDD\)/.test(f.detail));
   });
   t('XML reader: entities and CDATA', () => {
     const d = PK.kicad.xml('<a x="1 &amp; 2"><b>&lt;3</b><![CDATA[<raw>]]></a>');

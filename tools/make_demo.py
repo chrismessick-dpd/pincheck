@@ -6,6 +6,9 @@ Signoff EE's demos use) as a KiCad XML netlist, and a small part library.
 Writes demo/thermostat-main-pcba.xml and demo/library/*.json (with index.json). Pin numbers and names
 follow the real parts' datasheets; the circuit is made up. Library values are datasheet facts, left
 unverified except where the demo story says someone checked them.
+
+Planted for the checks (tests/test.js expects them): UART TX to TX (func.uart) and DISP_INT and TOUCH_INT
+on EXTI line 4 (func.exti).
 """
 import json, pathlib
 from xml.sax.saxutils import quoteattr, escape
@@ -76,7 +79,10 @@ NETS = {
     'RLY1': ['K1.A2', 'D1.A', 'Q1.C'], 'RLY2': ['K2.A2', 'D2.A', 'Q2.C'], 'RLY1_B': ['Q1.B', 'R1.1'], 'RLY2_B': ['Q2.B', 'R2.1'],
     'RLY1_EN': ['R1.2', 'U4.7'], 'RLY2_EN': ['R2.2', 'U4.8'],
     'I2C_SCL': ['R12.2', 'U4.32', 'J2.5'], 'I2C_SDA': ['R13.2', 'U4.1', 'J2.6'],
-    'UART_TX': ['U4.30', 'U1.30'], 'UART_RX': ['U4.31', 'U1.31'],
+    # Planted for the checks: the UART crosses wrong (U4's TX meets the module's TXD0), and two
+    # interrupt lines from the display connector share EXTI line 4 (PA4 and PB4).
+    'UART_TX': ['U4.30', 'U1.31'], 'UART_RX': ['U4.31', 'U1.30'],
+    'DISP_INT': ['J2.7', 'U4.11'], 'TOUCH_INT': ['J2.8', 'U4.28'],
     'CC1': ['J3.A5', 'R14.1'], 'CC2': ['J3.B5', 'R15.1'],
     'LED_G': ['D3.A', 'R16.1'], 'LED_R': ['D4.A', 'R17.1'], 'LED_GA': ['R16.2', 'U4.12'], 'LED_RA': ['R17.2', 'U4.13'],
     'NRST': ['U4.6'], 'SWDIO': ['U4.24'], 'SWCLK': ['U4.25'],
@@ -153,6 +159,7 @@ AF = {  # a few alternate functions, as the CubeMX import would list them
     'PB6': ['USART1_TX AF0', 'I2C1_SCL AF6', 'EXTI6'], 'PB7': ['USART1_RX AF0', 'I2C1_SDA AF6', 'EXTI7'],
     'PA0': ['ADC1_IN0', 'USART2_CTS AF1', 'EXTI0'], 'PA1': ['ADC1_IN1', 'USART2_RTS AF1', 'EXTI1'],
     'PA5': ['ADC1_IN5', 'SPI1_SCK AF0', 'EXTI5'], 'PA6': ['ADC1_IN6', 'SPI1_MISO AF0', 'EXTI6'],
+    'PA4': ['ADC1_IN4', 'SPI1_NSS AF0', 'EXTI4'], 'PB4': ['SPI1_MISO AF0', 'TIM3_CH1 AF1', 'EXTI4'],
     'PA13': ['SWDIO AF0', 'EXTI13'], 'PA14-BOOT0': ['SWCLK AF0', 'BOOT0', 'EXTI14']}
 
 

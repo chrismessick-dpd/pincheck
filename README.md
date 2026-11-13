@@ -17,8 +17,10 @@ Smart Thermostat's Main PCBA with a small library.
    supply domains. Fill the parameters by hand, or with Claude (below), then tick each value Verified
    against its datasheet page.
 4. Signed in to GitHub (the suite's sign-in), the library syncs with the private `pincheck_data` repo.
-
-Checks against the library are the next step (`docs/design.md`).
+5. Overview and Findings list what the checks found: supply pins against their ranges, I/O levels across
+   domains, pins that must be connected, interface nets on the right pin functions, required capacitors,
+   crystal load, and I2C addresses. A finding that rests on a value nobody verified is only a warning.
+   How the checks work: `docs/checks.md`.
 
 ## Part files
 
