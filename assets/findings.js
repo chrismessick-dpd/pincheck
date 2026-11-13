@@ -53,7 +53,7 @@
   }
   const statCard = (n, label, sev, filter, busy) => busy
     ? '<div class="card stat pk-statbtn pk-stat-' + sev + '"><div class="stat-num">–</div><div class="pk-muted">' + label + '</div></div>'
-    : '<button class="card stat pk-statbtn pk-stat-' + sev + (n ? ' has' : '') + '" data-sevonly="' + filter + '"><div class="stat-num">' + (n ? '<span aria-hidden="true">' + SEV[sev][0] + '</span> ' : '') + n + '</div><div class="pk-muted">' + label + '</div></button>';
+    : '<button class="card stat pk-statbtn pk-stat-' + sev + (n ? ' has' : '') + '" data-sevonly="' + filter + '"><div class="stat-num">' + (n ? (sev === 'info' ? '<span class="pk-info-ico" aria-hidden="true">i</span>' : '<span aria-hidden="true">' + SEV[sev][0] + '</span> ') : '') + n + '</div><div class="pk-muted">' + label + '</div></button>';
 
   // ── Findings ──
   function findings(d, run, ctx) {
