@@ -40,7 +40,7 @@ the suite's hard rules.
 - Built 2026-11-13: an Altium project's folder or .zip opens whole (`assets/archive.js`; see `docs/design.md`, *Inputs*).
 - Altium nets come from the Protel2 netlist (`assets/protel.js`). What's not built yet: `docs/design.md`, *Not built yet*.
 - **Send to Signoff EE (2026-11-13, Chris: Fabcheck's Send, into the Schematic Review checklist, with stored
-  runs and Open in Pincheck; no revisions; committed `7af9b5c`, not pushed):** design and footprint in
+  runs and Open in Pincheck; no revisions; pushed `7af9b5c`):** design and footprint in
   `docs/send-to-signoff-ee.md`. `assets/signoff.js` writes the issues into EE's working copy (ids `xpk…`, one per
   check and severity; notes and waived findings unticked to start); `assets/runs.js` makes the run (record plus a
   gzipped bundle of the parsed design and the part files used), keeps every sent run in IndexedDB
