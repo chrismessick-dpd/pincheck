@@ -370,6 +370,134 @@
     eq([d.parts.length, d.nets.length, d.drawings.length], [alt.parts.length, alt.nets.length, alt.drawings.length]);
   });
 
+  // ── Send to Signoff EE and stored runs (docs/send-to-signoff-ee.md). The send writes a made-up board under its
+  // own localStorage namespace, never Signoff's real working copy. ──
+  const SO = PK.signoff, RU = PK.runs;
+  const altRun = () => { alt.run = PK.checks.run(alt, lib); return alt.run; };
+  const schem = await (await fetch('../../ee_design_review/templates/schematic.json', { cache: 'no-store' })).json();
+  function fakeBoard() {
+    PK.SIGNOFF_NS = 'signoff.pktest.';
+    localStorage.setItem('signoff.pktest.projects', JSON.stringify({ 'main-pcba': { id: 'ptest1', meta: { name: 'Main PCBA', checklists: ['schematic', 'fab'], updatedAt: '2026-11-13' }, items: {}, custom: {}, comments: {}, sections: {} } }));
+    localStorage.removeItem('signoff.pktest.dirty');
+  }
+  const board = () => JSON.parse(localStorage.getItem('signoff.pktest.projects'))['main-pcba'];
+  const clearBoard = () => { for (const k of ['projects', 'dirty', 'ui', 'settings']) localStorage.removeItem('signoff.pktest.' + k); delete PK.SIGNOFF_NS; };
+
+  t('send: every check maps to a Schematic Review section that exists', () => {
+    const ids = new Set(schem.sections.map(s => s.id));
+    for (const c of PK.checks.CATALOG) ok(ids.has(SO.sectionFor(c.key)), c.key + ' → ' + SO.sectionFor(c.key));
+    for (const [id, title] of Object.entries(SO.SECTIONS)) eq(schem.sections.find(s => s.id === id).title, title);
+  });
+  t('send: one issue per check and severity on the Schematic checklist; notes and waived left out when skipped', () => {
+    fakeBoard();
+    try {
+      const fs = altRun().findings.map(f => Object.assign({}, f, { waived: null }));
+      fs[0] = Object.assign({}, fs[0], { waived: { reason: 'variant', by: 'tester', at: '2026-11-13', scope: 'one' } });
+      // The demo has no errors, so one made up here: errors go as Major.
+      fs.push({ id: 'supply.range:U4.4', check: 'supply.range', group: 'Supply', severity: 'error', title: 'U4 VDD at 5 V is above its 3.6 V maximum', detail: '', refs: ['U4'], pins: ['U4.4'], nets: ['5V'], basis: [], unverified: false, waived: null });
+      const plan = SO.plan(fs);
+      ok(plan.some(g => g.waived), 'a waived group');
+      const skip = new Set(plan.filter(g => g.waived || g.severity === 'info').map(g => g.key));
+      const pv = SO.preview('main-pcba', plan);
+      ok(pv.rows.every(r => r.state === 'new'));
+      const r = SO.send('main-pcba', plan, { label: 'Main PCBA', run: { id: 'pktest0001' } }, skip);
+      const p = board(), sent = plan.filter(g => !skip.has(g.key));
+      eq(r.created, sent.length); eq(Object.keys(p.custom).length, sent.length);
+      for (const c of Object.values(p.custom)) {
+        ok(/^xpk/.test(c.id), c.id); eq(c.checklist, 'schematic'); eq(c.source.tool, 'pincheck'); eq(c.source.run.id, 'pktest0001');
+        ok(c.source.locations.length && c.source.locations.every(l => l.finding), 'locations name findings');
+        eq(p.items[c.id].status, 'issue'); ok(c.severity === 'major' || c.severity === 'minor');
+      }
+      ok(Object.values(p.custom).some(c => c.severity === 'major' && /^Pincheck: /.test(c.text)), 'errors are Major');
+      ok(JSON.parse(localStorage.getItem('signoff.pktest.dirty')).ptest1, 'marked dirty for Signoff\'s sync');
+      // Sending again updates the same issues and keeps the reviewer's resolution; a finding gone gets a note.
+      const first = Object.keys(p.custom)[0];
+      const all = JSON.parse(localStorage.getItem('signoff.pktest.projects')); all['main-pcba'].items[first].resolution = 'fixed';
+      localStorage.setItem('signoff.pktest.projects', JSON.stringify(all));
+      const fewer = SO.plan(fs.filter(f => SO.stableId('ptest1', f.check, f.severity) !== first || f.waived || f.severity === 'info'));
+      const r2 = SO.send('main-pcba', fewer, { label: 'Main PCBA', run: { id: 'pktest0002' } }, skip);
+      eq(r2.created, 0); eq(board().items[first].resolution, 'fixed');
+      // The gone one was Fixed, so it gets no "no longer found" note; an open one would.
+      eq(r2.resolvedNotes, 0);
+      // Ticking the waived group sends a reference row, counted nowhere.
+      const r3 = SO.send('main-pcba', plan, { label: 'Main PCBA', run: { id: 'pktest0003' } }, new Set());
+      const ref = Object.values(board().custom).find(c => c.reference === true);
+      ok(ref && /^Waived in Pincheck/.test(ref.text) && board().items[ref.id].resolution === 'waived', 'reference row');
+      ok(r3.created >= 1);
+    } finally { clearBoard(); }
+  });
+  t('stored run: the bundle reopens as the same design, with the same findings from its own part files', async () => {
+    altRun();
+    const made = await RU.make(alt, lib, 'tester');
+    ok(RU.RUN_ID.test(made.run.id), made.run.id);
+    eq(made.run.design.parts, alt.parts.length); eq(made.run.library.files, 2);
+    eq(made.run.design.sha256, await RU.sha256(made.bundle));
+    const again = await RU.make(alt, lib, 'tester');
+    eq(again.run.design.key, made.run.design.key, 'same design and part files, same key');
+    const b = await RU.open(made.bundle);
+    eq(b.library.map(f => f.id), ['stm32g071kbu6', 'tps562201ddcr']);
+    const re = PK.checks.run(b.design, b.library);
+    eq(re.findings.map(f => f.id + f.severity), alt.run.findings.map(f => f.id + f.severity));
+    eq(b.design.drawings.length, alt.drawings.length);
+    eq(made.findings.map(f => f.id), alt.run.findings.map(f => f.id));
+  });
+  t('stored run: stored in one commit beside the board, and a re-send uploads only the new run file', async () => {
+    const gh = window.FakeGitHub();
+    RU.setFetch(gh.fetch); RU.setToken('test-token');
+    try {
+      altRun();
+      const made = await RU.make(alt, lib, 'tester');
+      const got = await RU.store(made, 'ptest1');
+      ok(got.ok, got.why);
+      const dir = RU.home('ptest1').dir;
+      eq(got.run.design.path, dir + 'designs/' + made.run.design.key + '.json.gz');
+      eq(got.run.stored.dir, dir);
+      const tree = [...gh.trees.get(gh.commits.get(gh.head).tree).keys()].sort();
+      eq(tree, [dir + 'designs/' + made.run.design.key + '.json.gz', dir + 'runs/' + made.run.id + '.json'].sort());
+      eq(gh.stats.commits, 1);
+      // Read it back as Signoff EE does (app.js handOffPincheck, cleanPincheckRun): the run file, the bundle's
+      // place relative to the run's folder, and the bundle checked against its SHA-256.
+      const ee = new window.Signoff.GitHubStore({ owner: 'o', repo: 'r', branch: 'main', token: 'test-token' }, gh.fetch);
+      const entries = await ee.listTree(dir);
+      const file = JSON.parse(new TextDecoder().decode(await ee.readBytes(dir + 'runs/' + made.run.id + '.json', entries)));
+      const m = /(?:^|\/)designs\/([0-9a-f]{16})\.json\.gz$/.exec(file.run.design.path);
+      ok(m && m[1] === file.run.design.key, 'EE finds the bundle');
+      eq(file.findings.length, alt.run.findings.length);
+      const bytes = await ee.readVerified(dir + 'designs/' + m[1] + '.json.gz', file.run.design.sha256, entries);
+      ok(bytes instanceof Uint8Array, 'bytes as the hand-off wants them');
+      eq((await RU.open(bytes)).design.parts.length, alt.parts.length);
+      const posts = gh.stats.blobPosts;
+      const second = await RU.make(alt, lib, 'tester');
+      ok((await RU.store(second, 'ptest1')).ok);
+      eq(gh.stats.blobPosts - posts, 1, 'only the run file is new');
+      gh.deny = true; RU.clearProbes();
+      const third = await RU.store(await RU.make(alt, lib, 'tester'), 'ptest1');
+      ok(!third.ok && /can't write/.test(third.why), third.why);
+    } finally { RU.setFetch(null); RU.setToken(null); RU.clearProbes(); }
+  });
+  t('stored run: Signoff EE\'s hand-off is taken once, checked, and kept here', async () => {
+    altRun();
+    const made = await RU.make(alt, lib, 'tester');
+    const put = (db, entry) => new Promise((res, rej) => {
+      const r = indexedDB.open(db, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('runs', { keyPath: 'id' });
+      r.onsuccess = () => { const t2 = r.result.transaction('runs', 'readwrite'); t2.objectStore('runs').put(entry); t2.oncomplete = () => { r.result.close(); res(); }; t2.onerror = () => rej(t2.error); };
+      r.onerror = () => rej(r.error);
+    });
+    const del = id => new Promise(res => { const r = indexedDB.open('pincheck-runs', 1); r.onupgradeneeded = () => r.result.createObjectStore('runs', { keyPath: 'id' }); r.onsuccess = () => { const t2 = r.result.transaction('runs', 'readwrite'); t2.objectStore('runs').delete(id); t2.oncomplete = () => { r.result.close(); res(); }; }; });
+    try {
+      // A tampered bundle is refused.
+      await put('dovetail-handoff', { id: made.run.id, tool: 'pincheck', run: made.run, findings: made.findings, bundle: made.bundle.slice(0, -1), at: '' });
+      eq(await RU.find(made.run.id), null);
+      await put('dovetail-handoff', { id: made.run.id, tool: 'pincheck', run: made.run, findings: made.findings, bundle: made.bundle, at: '' });
+      const e = await RU.find(made.run.id);
+      ok(e && e.run.id === made.run.id, 'found');
+      ok(await RU.kept(made.run.id), 'kept here');
+      eq(await RU.takeHandoff(made.run.id), null, 'taken once');
+      eq(await RU.find('not-a-run'), null);
+    } finally { await del(made.run.id); }
+  });
+
   for (const [name, fn] of tests) {
     try { await fn(); out.push('✓ ' + name); } catch (e) { fails.push(name); out.push('✕ ' + name + '\n    ' + e.message); }
   }

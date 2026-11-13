@@ -108,6 +108,8 @@
 
   // The checks run when a design opens and again whenever the library changes (assets/checks.js).
   function ensureRun(d) {
+    // A run reopened from Signoff EE keeps its findings as sent until "Run checks again".
+    if (d.fromRun && d.run) return d.run;
     if (d.run && d.runGen === state.libGen) return d.run;
     try { d.run = PK.checks.run(d, state.lib); } catch (e) { console.error(e); toast('The checks stopped: ' + e.message, 'error'); d.run = { findings: [], rails: [], coverage: {}, parts: {}, ms: 0, hasNets: false }; }
     d.runGen = state.libGen;
@@ -124,7 +126,8 @@
   function saveWaivers(d, list) { try { localStorage.setItem(WAIVE_KEY(d), JSON.stringify(list)); } catch (e) { toast('Couldn\'t save the waiver in this browser', 'error'); } }
   function applyWaivers(d) {
     const list = loadWaivers(d);
-    for (const f of d.run.findings) f.waived = list.find(w => (w.scope === 'one' ? w.key === f.id : w.key === similarKey(f))) || null;
+    // A stored run's findings keep the waivers they were sent with; this browser's add to them.
+    for (const f of d.run.findings) f.waived = list.find(w => (w.scope === 'one' ? w.key === f.id : w.key === similarKey(f))) || f.sentWaived || null;
   }
   function waiveSheet(d, f) {
     const like = d.run.findings.filter(x => !x.waived && similarKey(x) === similarKey(f));
@@ -168,6 +171,218 @@
     state.sync.busy = false; renderToolbar();
   }
 
+  // ── Send to Signoff EE (docs/send-to-signoff-ee.md), laid out as Fabcheck's Send ──
+  // One issue per check and severity. Details lists them, each with a box; the keys left out (check|severity,
+  // so they survive a re-run) are in d.soSkip. Notes and waived findings start unticked: a group's key goes
+  // into the skip set the first time it shows (d.soSeen), and from then on follows its box.
+  const plural = (n, a, b) => n + ' ' + (n === 1 ? a : b || a + 's');
+  const S = () => PK.signoff, R = () => PK.runs;
+  const repoProbe = new Map();   // board id -> { busy } | readiness
+  const sendPlan = d => S().plan(ensureRun(d).findings);
+  function sendSkip(d, groups) {
+    const skip = d.soSkip || (d.soSkip = new Set()), seen = d.soSeen || (d.soSeen = new Set());
+    for (const g of groups) if ((g.waived || g.severity === 'info') && !seen.has(g.key)) { seen.add(g.key); skip.add(g.key); }
+    return skip;
+  }
+  const storing = () => !DEMO && !!R();
+  function sendHtml(d) {
+    // A run reopened from Signoff EE was sent already; sending it again would bundle today's library with
+    // its old findings. After "Run checks again" it is a current run, and Send comes back.
+    if (scanning(d) || d.fromRun) return '';
+    const groups = sendPlan(d), skip = sendSkip(d, groups);
+    let h = '<div class="section-title pk-sect">Send to Signoff EE</div><div class="card pk-send">';
+    const projects = S().projects();
+    const signedIn = !storing() || R().signedIn();
+    if (!projects.length) {
+      if (DEMO) return h + '<p class="pk-send-p">No Signoff EE demo boards in this browser yet. Open the <a href="../ee_design_review/index.html?demo">Signoff EE demo</a> once (it sets up its sample boards in this browser), then come back.</p></div>';
+      return h + '<p class="pk-send-p">For design reviews in Signoff EE: send this run\'s errors and warnings to a board\'s Schematic Review, with the run, stored in the board\'s private repository. ' +
+        (signedIn ? 'Open <a href="../ee_design_review/index.html">Signoff EE</a> once at this same address (it keeps its boards in this browser), then come back.' : 'Sign in with GitHub (Settings, at the foot of the sidebar), then open Signoff EE once at this same address.') + '</p></div>';
+    }
+    // The board: the one this run was sent to or opened from, else a guess from the design's name.
+    if (!d.soSlug || !projects.some(p => p.slug === d.soSlug)) {
+      const pid = (d.fromRun && d.fromRun.projectId) || (d.sentTo && d.sentTo.projectId), lab = d.name.toLowerCase().replace(/\s+/g, '');
+      const guess = (pid && projects.find(p => p.id === pid)) || projects.find(p => [p.meta.board, p.meta.name].some(x => x && lab.includes(String(x).toLowerCase().replace(/\s+/g, '')))) ||
+        projects.find(p => (p.meta.checklists || []).includes(S().CHECKLIST)) || projects[0];
+      d.soSlug = guess.slug;
+    }
+    const target = projects.find(p => p.slug === d.soSlug);
+    const pv = S().preview(d.soSlug, groups);
+    const kind = S().kindOf;
+    const pickedAll = pv.rows.filter(r => !skip.has(r.group.key)), nRef = pickedAll.filter(r => r.group.waived).length;
+    const picked = pickedAll.filter(r => !r.group.waived), nIssues = pv.rows.filter(r => !r.group.waived).length;
+    const major = picked.filter(r => r.severity === 'major').length, fresh = picked.filter(r => r.state !== 'update').length;
+    const notes = picked.some(r => r.group.severity === 'info');
+    const sevs = [major && `${major} Major from errors`, picked.length - major && `${picked.length - major} Minor from warnings${notes ? ' and notes' : ''}`].filter(Boolean).join(', ');
+    const news = [fresh && `${fresh} new`, picked.length - fresh && `${picked.length - fresh} updating ${picked.length - fresh === 1 ? 'an issue' : 'issues'} sent before`].filter(Boolean).join(', ');
+    const issues = !nIssues ? 'No findings to send; earlier Pincheck issues get a "no longer found" note.'
+      : picked.length ? `Sends ${picked.length < nIssues ? picked.length + ' of ' : ''}${plural(nIssues, 'issue')} to the Schematic Review checklist (${sevs}; ${news}).`
+      : `No issues picked, so none are sent (${plural(nIssues, 'issue')} available); sending still stores the run, and earlier issues for these checks stay as they are.`;
+    const left = [pv.rows.some(r => kind(r.group) === 'notes' && skip.has(r.group.key)) && 'notes', pv.rows.some(r => r.group.waived && skip.has(r.group.key)) && 'waived findings'].filter(Boolean);
+    const refNote = nRef ? ` Also sends ${plural(nRef, 'group')} of waived findings, kept in Signoff for reference and counted nowhere.` : '';
+    const leftNote = left.length ? ` ${left.join(' and ').replace(/^./, c => c.toUpperCase())} stay in Pincheck (tick them under Details to send them).` : '';
+    h += `<p class="pk-send-p">${issues}${refNote}${leftNote} Sending again updates the same issues and keeps the reviewer's status. ${DEMO ? 'In this demo they go to the Signoff EE demo in this browser, and the run is kept in this browser.' : "Signoff's Sync then pushes the issues, and each one opens this run in Pincheck."}</p>` +
+      `<div class="filters" style="margin:0"><label class="tb-field" style="font-size:13px">Board <select data-id="so-project">${projects.map(p => `<option value="${esc(p.slug)}"${p.slug === d.soSlug ? ' selected' : ''}>${esc(p.meta.name)}${p.meta.board ? ' · ' + esc(p.meta.board) : ''}${(p.meta.checklists || []).includes(S().CHECKLIST) ? '' : ' (no Schematic checklist)'}</option>`).join('')}</select></label>` +
+      `<button class="btn btn-primary" data-act="so-send"${d.soBusy ? ' disabled' : ''}>${d.soBusy ? 'Storing…' : 'Send to Signoff EE'}</button><button class="btn so-toggle${d.soOpen ? ' open' : ''}" data-act="so-details" aria-expanded="${!!d.soOpen}">Details <span class="sec-chev" aria-hidden="true">▾</span></button>${d.soResult ? '<button class="btn btn-plain" data-act="so-back" data-project="' + esc(target.id) + '">Open Signoff EE</button>' : ''}</div>`;
+    if (d.soOpen && groups.length) h += sendListHtml(d, pv, skip);
+    if (!(target.meta.checklists || []).includes(S().CHECKLIST)) h += '<p class="note">This board doesn\'t use the Schematic Review checklist, so the issues won\'t show until you add it in the board\'s details in Signoff EE.</p>';
+    h += storageHtml(target.id);
+    if (d.soBlocked) h += `<div class="note pk-warn">Not sent: the run couldn't be stored (${esc(d.soBlocked)}). Without it, Signoff's issues can't open the run in Pincheck.<div style="margin-top:8px"><button class="btn" data-act="so-send">Try again</button> <button class="btn btn-plain" data-act="so-anyway">Send without storing</button></div></div>`;
+    if (d.soResult) h += `<p class="note pk-ok">${esc(d.soResult)}</p>`;
+    return h + '</div>';
+  }
+  // Where Send will store the run, or why it can't, from a cached check of the board's repo.
+  function storageHtml(projectId) {
+    if (!storing()) return '';
+    const repo = R().home(projectId).repo;
+    if (!R().signedIn()) return `<p class="note">Sending stores the run in ${esc(repo)}, the board's private repository, and asks you to sign in to GitHub first.</p>`;
+    const pr = repoProbe.get(projectId);
+    if (!pr) { repoProbe.set(projectId, { busy: true }); R().probe(projectId).then(r => { repoProbe.set(projectId, r); if (state.tab === 'overview') renderView(); }); }
+    if (!pr || pr.busy) return `<p class="note">Checking access to ${esc(repo)}…</p>`;
+    if (!pr.ok) return `<p class="note pk-warn">Can't store the run in ${esc(pr.repo)}: ${esc(pr.text)}.</p>`;
+    return `<p class="note">Sending stores this run (the design as read, the part files it used, and its findings) in ${esc(pr.repo)}, the board's private repository, where anyone with access to the board can open it from Signoff EE.</p>`;
+  }
+  function sendListHtml(d, pv, skip) {
+    const says = { new: 'New issue', deleted: 'Re-raises a deleted issue', update: 'Updates the issue sent before' };
+    const saysRef = { new: 'New reference row', deleted: 'Brings back a removed reference row', update: 'Updates the reference row sent before' };
+    const kind = S().kindOf;
+    const box = (k, label) => {
+      const rows = pv.rows.filter(r => kind(r.group) === k);
+      return rows.length ? `<label class="so-all"><input type="checkbox" data-id="so-kind" data-kind="${k}"${rows.every(r => !skip.has(r.group.key)) ? ' checked' : ''}> ${label} (${rows.length})</label>` : '';
+    };
+    const all = pv.rows.filter(r => kind(r.group) === 'error' || kind(r.group) === 'warn').every(r => !skip.has(r.group.key));
+    let h = `<div class="so-list"><div class="so-alls"><label class="so-all"><input type="checkbox" data-id="so-all"${all ? ' checked' : ''}> All errors and warnings</label>${box('error', 'Errors')}${box('warn', 'Warnings')}${box('notes', 'Notes')}${box('waived', 'Waived, for reference')}</div>`;
+    pv.rows.forEach((r, i) => {
+      const g = r.group, n = g.list.length, on = !skip.has(g.key);
+      h += `<div class="so-row${on ? '' : ' off'}"><input type="checkbox" id="so-${i}" data-id="so-pick" data-key="${esc(g.key)}"${on ? ' checked' : ''}>` +
+        `<div><label class="item-text" for="so-${i}">${esc(r.text)}</label>` +
+        `<div class="item-sub">${g.waived ? '<span class="res waived">Waived · reference</span>' : `<span class="sev ${r.severity}">${r.severity === 'major' ? 'Major' : 'Minor'}</span>`}<span class="tag pk-mono">${esc(g.check)}</span><span>${esc(r.section)}</span><span>${(g.waived ? saysRef : says)[r.state]}${r.resolution ? ` <span class="res ${r.resolution}">${r.resolution === 'fixed' ? 'Fixed' : 'Waived'}</span>` : ''}</span></div>` +
+        `<details class="so-locs"><summary>${plural(n, (g.waived ? 'waived ' : '') + (g.severity === 'error' ? 'error' : g.severity === 'warn' ? 'warning' : 'note'))}</summary><ul>` +
+        g.list.slice(0, 25).map(f => `<li>${esc(f.title)}${f.refs.length || f.nets.length ? `<span class="pk-muted"> · ${esc([f.refs.slice(0, 4).join(', '), f.nets.slice(0, 3).join(', ')].filter(Boolean).join(' · '))}</span>` : ''}</li>`).join('') +
+        (n > 25 ? `<li class="pk-muted">… ${n - 25} more</li>` : '') + '</ul></details></div></div>';
+    });
+    if (pv.gone.length) h += `<div class="so-gone">Sent before and not found by this run, so each gets a "no longer found" note: ${pv.gone.map(t => `<b>${esc(t)}</b>`).join(', ')}.</div>`;
+    if (pv.dropped.length) h += `<div class="so-gone">Reference rows sent before whose findings aren't waived any more, so they are removed: ${pv.dropped.map(t => `<b>${esc(t)}</b>`).join(', ')}.</div>`;
+    return h + '</div>';
+  }
+
+  // A wait that says what it is doing: a card over the page with a spinner, a step line, and a bar (.busy in
+  // suite.css, from Signoff EE; the same card as Fabcheck's). Actions are [label, fn, primary].
+  function busyCard(title) {
+    const old = $('#busy-wrap'); if (old) old.remove();
+    const w = document.createElement('div');
+    w.className = 'sheet-wrap'; w.id = 'busy-wrap';
+    w.innerHTML = '<div class="sheet busy" role="status" aria-live="polite"><div class="busy-row"><span class="busy-spin" aria-hidden="true"></span><div style="flex:1;min-width:0">' +
+      '<div class="busy-title">' + esc(title) + '</div><div class="busy-step"></div><div class="busy-bar"><i></i></div></div></div><div class="busy-acts"></div></div>';
+    document.body.appendChild(w);
+    const card = w.firstChild, stepEl = w.querySelector('.busy-step'), bar = w.querySelector('.busy-bar i'), acts = w.querySelector('.busy-acts');
+    const close = () => w.remove();
+    return {
+      step(text, frac) { stepEl.textContent = text; if (frac != null) bar.style.width = Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%'; },
+      stop(text, actions, newTitle) {
+        card.classList.add('done'); stepEl.textContent = text;
+        if (newTitle) w.querySelector('.busy-title').textContent = newTitle;
+        acts.innerHTML = '';
+        for (const [label, fn, primary] of actions || [['Close', null, true]]) {
+          const b = document.createElement('button');
+          b.className = 'btn' + (primary ? ' btn-primary' : ''); b.textContent = label;
+          b.addEventListener('click', () => { close(); if (fn) fn(); }); acts.appendChild(b);
+        }
+        const p = acts.querySelector('.btn-primary'); if (p) p.focus();
+      },
+      close,
+    };
+  }
+  const paint = () => new Promise(r => { let done = false; const go = () => { if (!done) { done = true; setTimeout(r, 0); } }; requestAnimationFrame(go); setTimeout(go, 60); });
+  window.addEventListener('pageshow', ev => { if (ev.persisted) { const b = $('#busy-wrap'); if (b) b.remove(); } });
+
+  // Nothing leaves the browser without saying where it goes; Cancel keeps it all here.
+  function confirmStore(repo, made) {
+    const r = made.run;
+    return confirm(`This run, its findings, and the design as Pincheck read it (${r.design.name}: ${plural(r.design.parts, 'part')}, ${plural(r.design.nets, 'net')}, ${plural(r.design.sheets, 'file')}), with the ${plural(r.library.files, 'part file')} it was checked against (${(made.bundle.length / 1024).toFixed(0)} KB in all), will be stored in the private repository ${repo}, where everyone with access to the board can open them.\n\nOK to store them and send the issues. Cancel to keep everything in this browser.`);
+  }
+
+  // Send: make the run, store it with the board (asked first), then write the issues, so every issue carries
+  // where the run is. If it can't be stored, nothing is sent until "Send without storing".
+  async function sendToSignoff(d, anyway) {
+    if (d.soBusy) return;
+    const target = S().projects().find(p => p.slug === d.soSlug);
+    if (!target) { toast('That Signoff board is no longer in this browser', 'error'); return; }
+    if (storing() && !anyway && !R().signedIn()) { toast('Sign in to GitHub first, then send again'); if (window.SignoffFoot) window.SignoffFoot.settings(); return; }
+    d.soBlocked = null; d.soResult = null;
+    repoProbe.delete(target.id);
+    let card = busyCard('Sending to Signoff EE');
+    card.step('Packing the run…', 0.05);
+    await paint();
+    let made;
+    try { made = await R().make(d, state.lib, who()); } catch (err) { card.stop('Could not pack the run: ' + (err.message || err), null, 'Not sent'); return; }
+    if (storing() && !anyway) {
+      // The confirm names the run's size, so the card steps aside for it.
+      card.close();
+      if (!confirmStore(R().home(target.id).repo, made)) return;
+      d.soBusy = true; renderView();
+      card = busyCard('Sending to Signoff EE');
+      const got = await R().store(made, target.id, (t, f) => card.step(t, f));
+      d.soBusy = false;
+      if (!got.ok) { d.soBlocked = got.why; renderView(); card.stop(`The run couldn't be stored (${got.why}). Nothing was sent; the Send panel offers to send without storing.`, null, 'Not sent'); return; }
+    } else if (DEMO) made.run.stored = { repo: 'demo', dir: 'pincheck/' + target.id + '/' };   // the demo keeps it in this browser
+    card.step('Writing the issues into Signoff EE…', 0.95);
+    await paint();
+    try {
+      const plan = sendPlan(d);
+      sendSkip(d, plan);
+      const r = S().send(d.soSlug, plan, { label: d.name, run: made.run }, d.soSkip);
+      await R().keep(Object.assign({ projectId: r.projectId }, made)).catch(() => {});
+      d.sentTo = { projectId: r.projectId, name: r.name, runId: made.run.id };
+      d.soResult = `Sent to "${r.name}": ${r.created} new, ${r.updated} updated${r.skipped ? `, ${r.skipped} left out` : ''}${r.resolvedNotes ? `, ${r.resolvedNotes} earlier issue(s) noted as no longer found` : ''}${r.dropped ? `, ${r.dropped} reference row(s) removed` : ''}. ${DEMO ? 'Open Signoff EE to see them.' : 'Sync in Signoff EE to push them.'}`;
+      if (anyway) d.soResult += ' Sent without storing: Signoff can\'t open this run until it is sent again and stored.';
+      card.stop(d.soResult, [['Stay in Pincheck', null], ['Open in Signoff EE', () => S().openFindings(r.projectId), true]], 'Sent to Signoff EE');
+    } catch (err) { card.stop('Could not send: ' + err.message, null, 'Not sent'); }
+    renderView();
+  }
+
+  // ── Opening a run from Signoff EE: #/findings?run=<id>&project=<board id>&check=<check>&finding=<finding id> ──
+  // The run is one this browser kept, or the one Signoff EE handed over (PK.runs.find). Its design opens with
+  // its findings as sent; the finding opens on the Schematic tab (or in Findings when there are no drawings).
+  function linkParams() {
+    const m = /^#\/(\w+)\?(.*)$/.exec(location.hash || '');
+    if (!m) return null;
+    const q = new URLSearchParams(m[2]);
+    return { view: m[1], run: q.get('run') || '', project: q.get('project') || '', check: q.get('check') || '', finding: q.get('finding') || '' };
+  }
+  async function openLink() {
+    const l = linkParams();
+    if (!l || !l.run || !R()) return;
+    let d = state.designs.find(x => x.fromRun && x.fromRun.run.id === l.run);
+    if (!d) {
+      state.busy = 'Opening the run from Signoff EE'; state.view = 'design'; renderAll();
+      const e = await R().find(l.run).catch(() => null);
+      state.busy = null;
+      if (!e) { state.view = active() ? 'design' : 'home'; renderAll(); toast(DEMO ? 'That run isn\'t in this browser. In the demo, send from Pincheck first, then open it from Signoff EE.' : 'That run isn\'t in this browser, and Signoff EE didn\'t hand it over. Open it again from Signoff EE.', 'error'); return; }
+      try { d = await openStored(e, l.project); } catch (err) { state.view = active() ? 'design' : 'home'; renderAll(); toast('Couldn\'t open the run: ' + err.message, 'error'); return; }
+    }
+    state.active = d.id; state.view = 'design'; state.q = ''; state.sev = { error: true, warn: true, info: true };
+    const f = l.finding && d.run.findings.find(x => x.id === l.finding);
+    if (f && PK.viewer && d.sheetsDrawn) { state.tab = 'schematic'; state.showFinding = f; state.check = ''; }
+    else { state.tab = 'findings'; state.check = f ? '' : (PK.checks.byKey.get(l.check) ? l.check : ''); state.openFinding = f ? f.id : null; }
+    renderAll();
+    if (l.finding && !f) toast('That finding isn\'t in this run');
+  }
+  async function openStored(e, projectId) {
+    const b = await R().open(e.bundle);
+    const d = Object.assign(b.design, { id: 'r' + e.run.id, drawings: b.design.drawings || [], nets: b.design.nets || null, notes: b.design.notes || [], sheets: b.design.sheets || [] });
+    d.sheetsDrawn = d.drawings.length > 0;
+    d.fromRun = { run: e.run, projectId: projectId || e.projectId || '', library: b.library };
+    // The rails, coverage, and parts from the part files it used then; the findings as sent.
+    let run;
+    try { run = PK.checks.run(d, b.library); } catch (err) { run = { rails: [], coverage: {}, parts: {}, ms: 0, hasNets: !!d.nets }; }
+    run.findings = (e.findings || []).map(f => Object.assign({}, f, { refs: f.refs || [], pins: f.pins || [], nets: f.nets || [], basis: f.basis || [], sentWaived: f.waived || null }));
+    d.run = run; d.runGen = state.libGen;
+    applyWaivers(d);
+    state.designs.unshift(d);
+    return d;
+  }
+  window.addEventListener('hashchange', () => { if (linkParams()) openLink(); });
+
   // ── Rendering ──
   function renderAll() { renderSide(); renderToolbar(); renderTabs(); renderView(); }
 
@@ -187,7 +402,7 @@
     $('#design-list').innerHTML = state.designs.length ? state.designs.map(d => {
       const g = D.groups(d, ['ic', 'crystal']);
       const miss = g.filter(x => !L.find(state.lib, x.mpn)).length;
-      return '<button class="proj' + (d.id === state.active && state.view === 'design' ? ' active' : '') + '" data-design="' + d.id + '"><span class="pk-ico">' + ICON.chip + '</span><span class="proj-body"><span class="proj-name">' + esc(d.name) + '</span><span class="proj-sub">' + d.parts.length + ' parts · ' + (miss ? miss + ' not in library' : 'all ICs in library') + '</span></span></button>';
+      return '<button class="proj' + (d.id === state.active && state.view === 'design' ? ' active' : '') + '" data-design="' + d.id + '"><span class="pk-ico">' + ICON.chip + '</span><span class="proj-body"><span class="proj-name">' + esc(d.name) + '</span><span class="proj-sub">' + (d.fromRun ? 'Run sent ' + esc(new Date(d.fromRun.run.at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })) + ' · ' + d.run.findings.filter(f => !f.waived && f.severity !== 'info').length + ' issues' : d.parts.length + ' parts · ' + (miss ? miss + ' not in library' : 'all ICs in library')) + '</span></span></button>';
     }).join('') : '<div class="side-empty">Drop an Altium project (its folder or .zip), its sheets, or a netlist to start.</div>';
     $('#library-count').textContent = state.lib.length ? state.lib.length : '';
     $('#library-link').classList.toggle('active', state.view === 'library');
@@ -223,6 +438,7 @@
         const run = ensureRun(d);
         ctx.scan = !!(PK.scan && d.sheetsDrawn);
         ctx.scanning = ctx.scan && scanning(d);
+        ctx.after = PK.signoff ? sendHtml(d) : '';
         v.innerHTML = PK.pages.overview(d, run, ctx);
         const host = $('#pk-scan-host');
         if (host) {
@@ -344,12 +560,27 @@
     else if (a === 'library') { state.view = 'library'; $('#app').classList.remove('nav-open'); renderAll(); }
     else if (a === 'theme') { const t2 = isDark(readTheme()) ? 'light' : 'dark'; writeTheme(t2); applyTheme(t2); }
     else if (a === 'sync') syncNow();
-    else if (a === 'rerun') { const d = active(); if (d) { d.run = null; ensureRun(d); if (PK.scan && d.sheetsDrawn && state.tab === 'overview') d.scanPlay = true; else toast('Checked again: ' + d.run.findings.length + ' findings'); renderTabs(); renderView(); } }
+    else if (a === 'so-send' || a === 'so-anyway') { const d = active(); if (d) sendToSignoff(d, a === 'so-anyway'); }
+    else if (a === 'so-details') { const d = active(); if (d) { d.soOpen = !d.soOpen; renderView(); } }
+    else if (a === 'so-back') { if (!PK.signoff.openFindings(t.dataset.project)) toast('That board is not in Signoff EE in this browser', 'error'); }
+    else if (a === 'rerun') { const d = active(); if (d) { d.fromRun = null; d.run = null; ensureRun(d); if (PK.scan && d.sheetsDrawn && state.tab === 'overview') d.scanPlay = true; else toast('Checked again: ' + d.run.findings.length + ' findings'); renderTabs(); renderView(); } }
     else if (a === 'import') PK.editor.pickJson((text, name) => importJson(text, name));
     else if (a === 'export-all') { const b = new Blob([JSON.stringify(state.lib.map(L.strip), null, 2) + '\n'], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = 'pincheck-library.json'; l.click(); setTimeout(() => URL.revokeObjectURL(l.href), 1500); }
     else if (a === 'new-part') { const mpn = prompt('Part number'); if (mpn && mpn.trim()) editPart({ schema: L.SCHEMA, id: L.slug(mpn), mpn: mpn.trim(), match: [], manufacturer: '', kind: 'ic', description: '', package: '', datasheet: {}, pins: [], domains: [], values: [], made: { by: who(), at: new Date().toISOString(), how: 'by hand' } }, null, true); }
   });
-  document.addEventListener('change', e => { if (e.target.dataset.id === 'fgroup') { state.check = e.target.value; renderView(); } });
+  document.addEventListener('change', e => {
+    const id = e.target.dataset.id, d = active();
+    if (id === 'fgroup') { state.check = e.target.value; renderView(); return; }
+    if (!d || !/^so-/.test(id || '')) return;
+    // Send's board and its boxes (all errors and warnings, one kind, or one issue).
+    if (id === 'so-project') { d.soSlug = e.target.value; d.soResult = null; d.soBlocked = null; renderView(); return; }
+    const plan = sendPlan(d), skip = sendSkip(d, plan), on = e.target.checked, k = PK.signoff.kindOf;
+    const pick = g => skip[on ? 'delete' : 'add'](g.key);
+    if (id === 'so-pick') pick({ key: e.target.dataset.key });
+    else if (id === 'so-all') plan.filter(g => k(g) === 'error' || k(g) === 'warn').forEach(pick);
+    else if (id === 'so-kind') plan.filter(g => k(g) === e.target.dataset.kind).forEach(pick);
+    renderView();
+  });
   document.addEventListener('input', e => {
     if (e.target.dataset.id === 'fq') { state.q = e.target.value; const pos = e.target.selectionStart; renderView(); const n = $('[data-id="fq"]'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } return; }
     if (e.target.dataset.id === 'lib-q') { state.libQuery = e.target.value; const pos = e.target.selectionStart; renderView(); const n = $('[data-id="lib-q"]'); n.focus(); n.setSelectionRange(pos, pos); } });
@@ -388,6 +619,7 @@
       await openFiles(files);
       if (active()) active().name = 'Main PCBA (DT-1042 rev B)';
       renderAll();
+      await openLink();   // a link from Signoff EE's demo opens over the demo's designs
     } catch (e) { toast('Couldn\'t load the demo: ' + e.message, 'error'); }
   }
 
@@ -423,7 +655,7 @@
     intro: 'Pincheck reads schematics without signing in. Signed in, its part library syncs with the private pincheck_data repo.',
     changed: () => { renderToolbar(); syncNow(); }
   });
-  reloadLib().then(() => { if (DEMO) loadDemo(); else syncNow(); });
+  reloadLib().then(() => { if (DEMO) loadDemo(); else { syncNow(); openLink(); } });
   setTimeout(checkForUpdate, 5000);
   setInterval(checkForUpdate, 5 * 60000);
   setInterval(renderToolbar, 60000);

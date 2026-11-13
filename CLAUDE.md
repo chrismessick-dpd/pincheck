@@ -9,7 +9,8 @@ the suite's hard rules.
 - **Prototype.** Chris asked for it 2026-11-12: drop a schematic, find the ICs, list the ones not in
   the library, and configure them in a window; part files by hand or with an LLM, checked offline.
 - Repos: `chrismessick-dpd/pincheck` (public) and `chrismessick-dpd/pincheck_data` (private, the
-  library under `parts/`). No other tool links to Pincheck yet (Chris).
+  library under `parts/`). No other tool links to Pincheck yet (Chris), except Signoff EE's issues that came from
+  Pincheck (Open in Pincheck, below).
 - Built: SchDoc, Protel2, and KiCad XML reading, part identification, the library (IndexedDB, sync), the part
   window, the 201-key catalog, the CubeMX importer, `tools/part.js`, the `pincheck-part` skill, the demo.
 - **Library (2026-11-13, Chris: fill parts as designs are tried, including every part in stored Fabcheck
@@ -35,6 +36,15 @@ the suite's hard rules.
   target. See `docs/design.md`, *The scan panel*.
 - Built 2026-11-13: an Altium project's folder or .zip opens whole (`assets/archive.js`; see `docs/design.md`, *Inputs*).
 - Altium nets come from the Protel2 netlist (`assets/protel.js`). What's not built yet: `docs/design.md`, *Not built yet*.
+- **Send to Signoff EE (2026-11-13, Chris: Fabcheck's Send, into the Schematic Review checklist, with stored
+  runs and Open in Pincheck; no revisions; built, not committed):** design and footprint in
+  `docs/send-to-signoff-ee.md`. `assets/signoff.js` writes the issues into EE's working copy (ids `xpk…`, one per
+  check and severity; notes and waived findings unticked to start); `assets/runs.js` makes the run (record plus a
+  gzipped bundle of the parsed design and the part files used), keeps every sent run in IndexedDB
+  `pincheck-runs[-demo]`, stores it in the board's repo under `pincheck/<id>/` (engine `GitHubStore.putFiles`,
+  vendored to `assets/vendor/` by `tools/sync_vendor.py`), and takes EE's hand-off. Links:
+  `#/findings?run=&project=&check=&finding=`. A reopened run shows its findings as sent until Run checks again.
+  Tried in the demo only; the live store and hand-off are tested against a fake GitHub (`tests/fake-github.js`).
 
 ## Rules
 
@@ -57,10 +67,11 @@ the suite's hard rules.
 
 ## Before finishing a change
 
-1. `python tools/make_demo.py` if the demo changed.
+1. `python tools/make_demo.py` if the demo changed. `python tools/sync_vendor.py --check` after an engine
+   change to `model.js` or `github.js`.
 2. `python tools/stamp_version.py`.
 3. Serve the tools folder (preview `signoff-suite-alt`, port 8774) and open `pincheck/tests/test.html`:
-   PASS (33 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
+   PASS (39 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
    three sheets.
 4. In the browser pane, scripts are cached: fetch changed files with `{cache: 'reload'}` first. The demo
    library is loaded into IndexedDB `pincheck-demo` once; delete that database to reload it.

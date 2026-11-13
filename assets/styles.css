@@ -313,3 +313,26 @@ body.pk-dragging .pk-dropzone { display: grid; }
   .sp-card.busy { animation: none; box-shadow: 0 0 0 2px var(--sp-glow); }
   .sp-picks span::after { transition: none; }
 }
+
+/* Send to Signoff EE (docs/send-to-signoff-ee.md): Fabcheck's Send panel, the issues it would write, each with a box */
+.pk-send { padding: 18px 20px; }
+.pk-send-p { margin: 0 0 12px; color: var(--text-2); }
+.pk-send .note.pk-warn { color: var(--warn); }
+.pk-send .note.pk-ok { color: var(--pass); }
+.so-toggle .sec-chev { margin-left: 4px; display: inline-block; transition: transform 0.2s var(--ease); }
+.so-toggle.open .sec-chev { transform: rotate(180deg); }
+.so-list { margin-top: 14px; border-top: 1px solid var(--hair); }
+.so-all { display: flex; align-items: center; gap: 10px; padding: 10px 2px; font-size: 13px; color: var(--text-2); cursor: pointer; }
+.so-alls { display: flex; flex-wrap: wrap; gap: 0 22px; border-bottom: 1px solid var(--hair); }
+.so-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; padding: 10px 2px; border-bottom: 1px solid var(--hair); }
+.so-row input, .so-all input { margin: 3px 0 0; accent-color: var(--accent); }
+.so-row label.item-text { display: block; cursor: pointer; word-break: break-word; }
+.so-row .item-sub { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; font-size: 12px; color: var(--text-3); margin-top: 4px; }
+.so-row.off .item-text, .so-row.off .item-sub { color: var(--text-3); }
+.so-row.off .item-text { text-decoration: line-through; }
+.so-locs { margin-top: 6px; font-size: 12.5px; color: var(--text-2); }
+.so-locs summary { cursor: pointer; color: var(--accent); width: max-content; }
+.so-locs ul { margin: 6px 0 0; padding-left: 18px; }
+.so-locs li { margin: 2px 0; word-break: break-word; }
+.so-gone { padding: 10px 2px 0; font-size: 12.5px; color: var(--text-3); }
+.pk-stored { margin-top: 4px; }

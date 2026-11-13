@@ -16,7 +16,16 @@
   function head(d, sub) {
     const src = d.source === 'kicad' ? 'KiCad netlist' : d.netlist ? 'Altium schematic and Protel2 netlist' : d.source === 'altium' ? 'Altium schematic' : 'Schematic';
     return '<div class="page-head"><div class="page-head-text"><div class="eyebrow">' + esc(src) + '</div><h1 class="page-title">' + esc(d.name) + '</h1><div class="page-sub">' + sub + '</div></div>' +
-      '<div class="pk-head-actions"><button class="btn" data-act="rerun" title="Run the checks again with the library as it is now">Run checks again</button></div></div>';
+      '<div class="pk-head-actions"><button class="btn" data-act="rerun" title="Run the checks again with the library as it is now">Run checks again</button></div></div>' + storedNote(d);
+  }
+  // A run reopened from Signoff EE (docs/send-to-signoff-ee.md): its findings as sent, not checked again.
+  function storedNote(d) {
+    const s = d.fromRun;
+    if (!s) return '';
+    const r = s.run, when = r.at ? new Date(r.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    return '<div class="hint pk-stored"><b>A run sent to Signoff EE</b>Checked ' + esc(when) + (r.by ? ' by ' + esc(r.by) : '') + ' with Pincheck ' + esc((r.tool && r.tool.version) || '') +
+      ' and the ' + plural((r.library && r.library.files) || 0, 'part file') + ' it used then. These are its findings as sent; “Run checks again” checks it against the library as it is now.' +
+      (s.projectId ? ' <button class="pk-link" data-act="so-back" data-project="' + esc(s.projectId) + '">Back to Signoff EE</button>' : '') + '</div>';
   }
 
   // ── Overview ──
@@ -49,7 +58,7 @@
     h += rails.length ? '<div class="card pk-scroll"><table class="table pk-rails"><thead><tr><th>Net</th><th class="pk-num">Voltage</th><th>From</th></tr></thead><tbody>' +
       rails.map(r => '<tr><td class="pk-mono">' + esc(r.net) + '</td><td class="pk-num">' + (+r.v.toFixed(3)) + ' V</td><td class="pk-desc">' + esc(r.from) + (r.unverified ? ' <span class="pk-tag-unv">unverified</span>' : '') + '</td></tr>').join('') + '</tbody></table></div>'
       : '<p class="pk-muted">No rail voltages could be worked out: no regulator in the library sets one, and no net name states one.</p>';
-    return h + '</div>';
+    return h + (ctx.after || '') + '</div>';
   }
   const statCard = (n, label, sev, filter, busy) => busy
     ? '<div class="card stat pk-statbtn pk-stat-' + sev + '"><div class="stat-num">–</div><div class="pk-muted">' + label + '</div></div>'
