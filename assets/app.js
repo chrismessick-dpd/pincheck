@@ -522,7 +522,7 @@
     const missing = ics.filter(g => g.mpn && !L.find(state.lib, g.mpn));
     return '<div class="page pk-wide"><div class="page-head"><div class="page-head-text"><div class="eyebrow">' + (d.source === 'kicad' ? 'KiCad netlist' : d.source === 'altium' ? (d.netlist ? 'Altium schematic and Protel2 netlist' : 'Altium schematic') : 'Schematic') + '</div><h1 class="page-title">' + esc(d.name) + '</h1>' +
       '<div class="page-sub"><span>' + d.sheets.length + ' file' + (d.sheets.length === 1 ? '' : 's') + '</span><span class="sep">·</span><span>' + d.parts.length + ' parts</span><span class="sep">·</span><span>' + (d.nets ? d.nets.length + ' nets' : 'no netlist yet') + '</span></div></div>' +
-      '<div class="pk-head-actions">' + (missing.length ? '<button class="btn btn-primary" data-config="' + esc(missing[0].part.ref) + '">Configure next (' + missing.length + ' left)</button>' : '') + '</div></div>' +
+      '<div class="pk-head-actions">' + (missing.length > 1 ? '<button class="btn" data-act="batch">Batch configure (' + missing.length + ')…</button>' : '') + (missing.length ? '<button class="btn btn-primary" data-config="' + esc(missing[0].part.ref) + '">Configure next (' + missing.length + ' left)</button>' : '') + '</div></div>' +
       '<div class="grid grid-4 pk-stats">' + stat(known.length + ' / ' + ics.length, 'ICs and crystals in the library') + stat(missing.length, 'to configure', missing.length ? 'warn' : '') + stat(ics.filter(g => !g.mpn).length, 'without a part number') + stat(state.lib.length, 'part files in the library') + '</div>' +
       (d.notes.length ? '<div class="hint" style="margin-top:16px">' + d.notes.map(esc).join('<br>') + '</div>' : '') +
       '<div class="pk-filter"><div class="seg">' + Object.entries(FILTERS).map(([k, [l]]) => '<button data-filter="' + k + '" class="' + (state.filter === k ? 'on' : '') + '">' + l + '</button>').join('') + '</div></div>' +
@@ -562,6 +562,69 @@
     else editPart(L.fromSchematic(part, who()), part, true);
   }
 
+  // ── Batch configure (Chris, 2026-11-13): every part still to configure through the pincheck-part skill at
+  // once. One file holds a starter part file per part (its pins from the schematic); the prompt asks Claude Code
+  // to fill each from its datasheet into a folder beside it, and the part files it writes come back with Import.
+  const DS_KEY = 'pincheck.v1.datasheetDir';
+  function batchConfigure(d) {
+    const missing = D.groups(d, ['ic', 'crystal']).filter(g => g.mpn && !L.find(state.lib, g.mpn));
+    if (!missing.length) return;
+    const on = new Set(missing.map(g => g.mpn));
+    const slug = L.slug(d.name).slice(0, 40) || 'design';
+    const file = 'pincheck-batch-' + slug + '.json', out = 'pincheck-batch-' + slug;
+    let dir = ''; try { dir = localStorage.getItem(DS_KEY) || ''; } catch (e) { /* storage blocked */ }
+    const w = document.createElement('div');
+    w.className = 'sheet-wrap';
+    const chosen = () => missing.filter(g => on.has(g.mpn));
+    const prompt = () => {
+      const list = chosen();
+      return 'Use the pincheck-part skill to fill every part in the Pincheck batch file ' + file + ' (in my Downloads folder): ' +
+        plural(list.length, 'part') + ', one starter part file each, with its pins from the schematic.\n\n' +
+        'For each part, take its entry as the exported file and ' + (dir ? 'find its datasheet in ' + dir : 'ask me where its datasheet is') +
+        '. Write each finished part file as <id>.json in a new folder ' + out + ' beside the batch file.\n' +
+        'Run the parts in parallel subagents, a few at a time. At the end, list the parts you filled, how many values each has, and any whose datasheet you could not find; ask me before downloading a datasheet (makers\' sites only).\n\n' +
+        'Parts: ' + list.map(g => g.mpn + ' (' + g.refs.slice(0, 4).join(', ') + (g.refs.length > 4 ? ', …' : '') + ')').join(', ') + '.';
+    };
+    const draw = () => {
+      const list = chosen();
+      w.innerHTML = '<div class="sheet wide"><div class="sheet-head"><h2>Batch configure with Claude</h2><p>Fill every part still to configure in one Claude Code run. The datasheets stay on your computer; only Claude Code reads them.</p></div><div class="sheet-body">' +
+        '<div class="card pk-scroll pk-batch"><table class="table"><thead><tr><th><input type="checkbox" data-b="all"' + (list.length === missing.length ? ' checked' : '') + ' aria-label="All parts"></th><th>Part number</th><th>Refs</th><th>Description</th><th class="pk-num">Pins</th></tr></thead><tbody>' +
+        missing.map(g => '<tr><td><input type="checkbox" data-b="one" data-mpn="' + esc(g.mpn) + '"' + (on.has(g.mpn) ? ' checked' : '') + ' aria-label="' + esc(g.mpn) + '"></td><td class="pk-mono">' + esc(g.mpn) + '</td><td class="pk-refs">' + esc(g.refs.slice(0, 6).join(', ') + (g.refs.length > 6 ? ', …' : '')) + '</td><td class="pk-desc">' + esc(g.part.description || g.part.params.Value || '') + '</td><td class="pk-num">' + g.part.pins.length + '</td></tr>').join('') +
+        '</tbody></table></div>' +
+        '<ol class="pk-steps"><li>Save the batch file (' + plural(list.length, 'part') + ', each with its pins from the schematic): <button class="btn btn-sm" data-b="export"' + (list.length ? '' : ' disabled') + '>Save ' + esc(file) + '</button></li>' +
+        '<li>Datasheets folder, for the prompt: <input class="input pk-dsdir" data-b="dir" placeholder="Leave empty and Claude asks for each datasheet" value="' + esc(dir) + '"></li>' +
+        '<li>In Claude Code, started in the Dovetail tools folder, paste this: <button class="btn btn-sm" data-b="copy"' + (list.length ? '' : ' disabled') + '>Copy</button><pre class="pk-pre">' + esc(prompt()) + '</pre>Claude fills each part from its datasheet, every value with its page, all unverified. STM32s also come from STM32CubeMX’s database on this computer.</li>' +
+        '<li>Back here, import the part files it wrote (select them all in <span class="pk-mono">' + esc(out) + '</span>), then check each part’s values against the pages and tick Verified: <button class="btn btn-sm" data-b="import">Import part files…</button></li></ol></div>' +
+        '<div class="sheet-foot"><span class="spacer"></span><button class="btn btn-primary" data-b="close">Done</button></div></div>';
+    };
+    draw();
+    document.body.appendChild(w);
+    w.addEventListener('click', async e => {
+      const b = e.target.closest('[data-b]');
+      if (e.target === w || (b && b.dataset.b === 'close')) { w.remove(); return; }
+      if (!b) return;
+      const a = b.dataset.b;
+      if (a === 'export') {
+        const list = chosen().map(g => L.strip(L.fromSchematic(g.part, who())));
+        const blob = new Blob([JSON.stringify(list, null, 2) + '\n'], { type: 'application/json' });
+        const l = document.createElement('a'); l.href = URL.createObjectURL(blob); l.download = file; l.click(); setTimeout(() => URL.revokeObjectURL(l.href), 1500);
+      } else if (a === 'copy') {
+        try { await navigator.clipboard.writeText(prompt()); toast('Prompt copied'); } catch (err) { toast('Copy blocked: select the text instead', 'error'); }
+      } else if (a === 'import') PK.editor.pickJson((text, name) => importJson(text, name));
+    });
+    w.addEventListener('change', e => {
+      const b = e.target.dataset.b;
+      if (b === 'all') { if (e.target.checked) missing.forEach(g => on.add(g.mpn)); else on.clear(); draw(); }
+      else if (b === 'one') { if (e.target.checked) on.add(e.target.dataset.mpn); else on.delete(e.target.dataset.mpn); draw(); }
+    });
+    w.addEventListener('input', e => {
+      if (e.target.dataset.b !== 'dir') return;
+      dir = e.target.value.trim();
+      try { localStorage.setItem(DS_KEY, dir); } catch (err) { /* storage blocked */ }
+      const pre = w.querySelector('.pk-pre'); if (pre) pre.textContent = prompt();
+    });
+  }
+
   // ── Events ──
   document.addEventListener('click', async e => {
     const t = e.target.closest('[data-act],[data-design],[data-config],[data-filter],[data-edit],[data-alias],[data-tab],[data-sev],[data-sevonly],[data-fopen],[data-openfile],[data-show],[data-waive],[data-unwaive]');
@@ -599,6 +662,7 @@
     }
     const a = t.dataset.act;
     if (a === 'close-insp') closeInspector();
+    else if (a === 'batch') { const d = active(); if (d) batchConfigure(d); }
     else if (a === 'nav') toggleSidebar();
     else if (a === 'home') { state.view = 'home'; renderAll(); }
     else if (a === 'open') { const i = $('#file-input'); i.value = ''; i.click(); }

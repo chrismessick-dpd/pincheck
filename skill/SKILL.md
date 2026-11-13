@@ -13,6 +13,11 @@ Arguments: a part number, a datasheet PDF path, and optionally a part file expor
 (it holds the pins from the schematic symbol). If the PDF is missing, ask for it. Download a datasheet
 only if Chris asks, and only from the manufacturer's own site.
 
+**A batch file** from Pincheck's *Batch configure* (`pincheck-batch-<design>.json`) is a JSON array of exported
+part files. Fill each entry as its own part, exactly as below, with that entry as its exported file, and write
+each finished file as `<id>.json` in the folder the prompt names. Run the parts in subagents, a few at a
+time, each given this skill's steps and its one entry. Report every part at the end, with any datasheet not found.
+
 ## Rules
 
 - **Only the datasheet (and CubeMX for STM32s) is a source.** Don't fill values from memory. If the

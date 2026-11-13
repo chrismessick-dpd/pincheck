@@ -36,6 +36,10 @@ node tools/part.js check my-part.json --pins exported-from-pincheck.json
 (the skill is `skill/SKILL.md`, installed in `../.claude/skills/pincheck-part/`). It fills every parameter
 the datasheet gives, each with its page, all unverified. Import the file in the part window.
 
+**A batch with Claude:** a design's Parts page has *Batch configure* when two or more parts need part files. It
+saves one batch file (a starter part file per part, with its pins) and writes the prompt for Claude Code, which
+fills each from its datasheet into a folder beside the batch file; *Import part files…* brings them all in.
+
 **STM32s** from STM32CubeMX's database on this computer (pins, alternate functions, EXTI lines):
 
 ```bash

@@ -37,6 +37,10 @@ the suite's hard rules.
 - **Finding detail panel (2026-11-13, Chris: rows stay collapsed; a panel on the right like Fabcheck's, with a
   thumbnail that zooms into the Schematic tab):** `PK.pages.inspector`, `PK.viewer.preview`, and
   `zoomFromPreview`. See `docs/design.md`, *A finding's detail panel*.
+- **Batch configure (2026-11-13, Chris: run every part still to configure through the skill at once):** the Parts
+  page's *Batch configure (n)…* (`batchConfigure` in `app.js`) saves `pincheck-batch-<design>.json` (an array of
+  `L.fromSchematic` starters), writes the Claude Code prompt (datasheets folder kept in `pincheck.v1.datasheetDir`),
+  and imports the files Claude writes. `skill/SKILL.md` says how to fill a batch file.
 - Built 2026-11-13: an Altium project's folder or .zip opens whole (`assets/archive.js`; see `docs/design.md`, *Inputs*).
 - Altium nets come from the Protel2 netlist (`assets/protel.js`). What's not built yet: `docs/design.md`, *Not built yet*.
 - **Send to Signoff EE (2026-11-13, Chris: Fabcheck's Send, into the Schematic Review checklist, with stored
