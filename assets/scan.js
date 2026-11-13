@@ -24,6 +24,7 @@
   const TOTAL = 8000;        // a replay's length, ms (Chris, 2026-11-13: about 8 s)
   const MAX_BEATS = 8;       // at most this many beats per sheet per check; more parts share a beat
   const HOLD = 900;          // a replayed check holds at its end this long before playing again
+  const REPLAY_SLOW = 2.5;   // a replayed check plays this much slower than in the run, so its words can be read (Chris)
   const CARD_MIN = 208;      // the narrowest thumbnail; columns share the width equally
 
   const counts = fs => { const c = { error: 0, warn: 0, info: 0 }; for (const f of fs) c[f.severity]++; return c; };
@@ -211,7 +212,7 @@
     if (frozen != null) g.classList.add('frozen'); else g.addEventListener('animationend', e => { if (e.target === g) g.remove(); });
   }
   const setOnce = (node, key, html) => { if (node._k === key) return; node._k = key; node.innerHTML = typeof html === 'function' ? html() : html; };
-  const stepKey = S => S.done ? 'done' : (S.pick != null ? 'p' : '') + S.si + ':' + S.bi;
+  const stepKey = S => S.done ? 'done' : (S.pick != null ? 'p' : '') + S.si + ':' + S.lanes.map(l => l.bi).join(',');
 
   function progHtml(P) {
     let h = '<div class="sp-prog"><div class="sp-bar"><i class="sp-fill"></i><span class="sp-run"><s></s></span><div class="sp-steps">', g = '';
@@ -235,15 +236,19 @@
   }
 
   // The words beside the gallery: the check under way, or the finished run.
-  function sideText(P, S, run) {
+  function sideText(P, S, run, sheets) {
     if (S.done) {
       const c = counts(run.findings.filter(f => !f.waived));
       return '<div class="sp-eyebrow">Checks finished</div><div class="sp-title">' + plural(c.error, 'error') + ' · ' + plural(c.warn, 'warning') + '</div>' +
         '<div class="sp-desc">Each mark is a finding where it sits: ✕ an error, ▲ a warning, i a note. Pick one to see it on the sheet, or slide along the bar to replay a check.</div>';
     }
-    const s = S.step, nb = S.lane ? S.lane.n : 0, others = S.lanes.length - 1;
-    const who = S.beat ? '<b>' + esc(S.beat.ref) + '</b>' + (S.beat.more ? ' and ' + plural(S.beat.more, 'other part') : '') : '';
-    const what = s.cov.checked ? (S.beat ? 'Reading ' + who + (nb > 1 ? ' · ' + (S.bi + 1) + ' of ' + nb : '') + (others > 0 ? ' · and ' + plural(others, 'other sheet') + ' at once' : '') : 'Nothing on the sheets to show') : 'Nothing on this design for it';
+    const s = S.step;
+    // What each sheet is reading right now, by name: "Reading U7 on Power, U4 on MCU, and D3 on IO".
+    const part = b => '<b>' + esc(b.ref) + '</b>' + (b.more ? ' (+' + b.more + ')' : '');
+    const on = S.lanes.filter(l => l.beat).map(l => part(l.beat) + (sheets.length > 1 ? ' on ' + esc(sheets[l.sheet].name) : ''));
+    const list = on.length > 3 ? on.slice(0, 2).concat(['parts on ' + (on.length - 2) + ' more sheets']) : on;
+    const joined = list.length < 3 ? list.join(' and ') : list.slice(0, -1).join(', ') + ', and ' + list[list.length - 1];
+    const what = s.cov.checked ? (on.length ? 'Reading ' + joined : 'Nothing on the sheets to show') : 'Nothing on this design for it';
     let h = '<div class="sp-eyebrow">' + esc(s.group) + ' · check ' + (s.i + 1) + ' of ' + P.steps.length + (S.pick != null ? ' · replay' : '') + '</div><div class="sp-title">' + esc(s.title) + '</div>' +
       '<div class="sp-desc">Needs ' + esc(s.needs) + '. <span class="sp-now">' + what + '</span></div>';
     if (S.pick != null && s.cov.checked) {
@@ -299,8 +304,8 @@
         this.paint(S);
         if (S.done) { this.mode = { kind: 'done' }; if (this.onDone) this.onDone(); return; }
       } else if (m.kind === 'pick') {
-        const s = this.P.steps[m.i], el2 = now - m.start, loop = s.dur + HOLD;
-        this.paint(pickAt(this.P, m.i, RM() ? 1 : (el2 % loop) / s.dur, RM() ? 0 : Math.floor(el2 / loop)));
+        const s = this.P.steps[m.i], D = s.dur * REPLAY_SLOW, el2 = now - m.start, loop = D + HOLD;
+        this.paint(pickAt(this.P, m.i, RM() ? 1 : (el2 % loop) / D, RM() ? 0 : Math.floor(el2 / loop)));
       } else { this.paint(stateAt(this.P, this.P.total)); return; }
       if (this.el.isConnected) this.raf = requestAnimationFrame(t => this.frame(t));
       else if (m.kind === 'live') { this.mode = { kind: 'done' }; if (this.onDone) this.onDone(); }
@@ -316,7 +321,7 @@
       if (!this.u) this.scaleUnits();
       const P = this.P, e = this.el;
       this.progress(S);
-      setOnce(e.querySelector('.sp-cap'), stepKey(S), () => sideText(P, S, this.run));
+      setOnce(e.querySelector('.sp-cap'), stepKey(S), () => sideText(P, S, this.run, this.G.sheets));
       const busy = new Set(S.lanes.map(l => l.sheet));
       this.cards.forEach((c, i) => {
         c.classList.toggle('busy', busy.has(i));

@@ -159,12 +159,14 @@ section of `assets/styles.css` build it.
     steady ring.
   - Findings land as marks: ✕ in a striped square, ▲ dotted, and i in a ring. A click on one opens it on
     the Schematic tab (`data-show`).
-  - The words on the right say which check is running and which part it's reading.
+  - The words on the right say which check is running and what each sheet is reading, by sheet name ("Reading
+    U7 on Power, U4 on MCU, and K1 on IO"; beyond three sheets, "parts on N more sheets").
 - **The bar:** Fabcheck's, with each check's start ticked and checks that found something hatched. A click
   while it plays skips to the end.
 - **Replaying one check:** once the run is done, the bar is a slider of the 25 checks.
   - Press and slide, or use the arrow keys, Home, and End.
-  - The picked check plays again in a loop, its findings listed on the right.
+  - The picked check plays again in a loop, 2.5 times slower than in the run so its words can be read
+    (Chris), with its findings listed on the right.
   - Escape, or *Back to all results*, returns to the finished run.
 - **When it plays:** when a design opens, and on *Run checks again* (`d.scanPlay`). It doesn't play on a
   library change; the panel is rebuilt finished.
