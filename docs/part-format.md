@@ -50,13 +50,14 @@ differences).
 | Field | Meaning |
 |---|---|
 | `num`, `name` | Pin number and name. |
-| `role` | What the pin is for: `power-in`, `power-out`, `ground`, `io`, `input`, `output`, `open-drain`, `analog`, `clock-in`, `clock-out`, `reset`, `boot`, `enable`, `feedback`, `switch`, `bootstrap`, `power-good`, `nc` (may be tied), `dnc` (do not connect), `pad`, `other`. |
+| `role` | What the pin is for: `power-in`, `power-out`, `ground`, `io`, `input`, `output`, `open-drain`, `analog`, `bus` (a CAN, RS-485, RS-232, or USB data line: the domain's logic levels don't apply; its limits are `bus.absmax`, `can.vcm`, or the pin's own `vmax` and `absmax`), `clock-in`, `clock-out`, `reset`, `boot`, `enable`, `feedback`, `switch`, `bootstrap`, `power-good`, `nc` (may be tied), `dnc` (do not connect), `pad`, `other`. |
 | `domain` | For a power pin, the supply group it belongs to; for an I/O pin, the supply that powers it. Must be in `domains`. |
 | `ft` | `true` if the datasheet marks the pin 5 V tolerant. |
 | `functions` | Alternate functions and interface roles: `"I2C1_SCL AF6"`, `"EXTI8"`, `"ADC1_IN5"`. |
 | `reset` | State during and after reset: `hiz`, `analog`, `low`, `high`, `pull-up`, `pull-down`. |
 | `unused` | What the datasheet says to do when unused: `float`, `gnd`, `supply`, `pull`, `must`. |
 | `ext` | An external part the datasheet requires on the pin: `"4.7 µF to GND, ESR < 1 Ω"`. |
+| `vmax`, `absmax` | The pin's own recommended maximum and absolute maximum voltage, where they differ from its domain's `io.absmax` (I2C pins rated 1.98 V on a 3.3 V part, a pin rated BATT+0.3). Numbers in volts or expressions. The checks use these before the domain's. |
 | `note` | Anything else. |
 
 ## Values
@@ -79,7 +80,8 @@ optionally on one supply domain.
 | `ok` | `{ by, at }` once a person has checked it against the page. Editing the value clears it. Never written by a script or the skill. |
 
 A limit given relative to a supply stays an expression in a string, naming the file's domains:
-`"VDD+0.3"`, `"0.7*VDD"`, `"VSS-0.1"`. The checks evaluate it with the net voltages they work out.
+`"VDD+0.3"`, `"0.7*VDD"`, `"VSS-0.1"`, and `min(…, …)` or `max(…, …)` for a limit that is the
+smaller or larger of two: `"min(VDD+0.4, 4.0)"`. The checks evaluate it with the net voltages they work out.
 
 Checks treat a failure that rests on an unverified value as a warning that names the value to verify
 (Chris, 2026-11-12).

@@ -26,7 +26,8 @@ only if Chris asks, and only from the manufacturer's own site.
   48 MHz is `48000000` (Hz), 2.5 µA/V is `2.5e-6` (A/V), 125 °C is `125` (°C), 94 % is `94` (%).
   The unit string must equal the catalog's.
 - **Limits written relative to a supply stay expressions** in a string: `"VDD+0.3"`, `"0.7*VDD"`,
-  `"VSS-0.1"`. Use the file's domain names.
+  `"VSS-0.1"`. Use the file's domain names. A limit that is the smaller or larger of two uses
+  `min(…, …)` or `max(…, …)`: `"min(VDD+0.4, 4.0)"`.
 - **Ranges** use `min`, `typ`, `max` (any of them). Single numbers use `value`. Text uses `text`.
   Lists use `list` (an array of short strings).
 - **Absolute maximum and recommended operating are different keys.** Never copy one into the other.
@@ -48,7 +49,9 @@ only if Chris asks, and only from the manufacturer's own site.
 - **Fields:** `datasheet.url` only if the PDF prints it or Chris gave it; `made.by` is
   `"pincheck-part skill"`; `match` takes ordering variants the datasheet's ordering table shows with the
   same die and package (reel sizes like …DRYR and …DRYT), never other grades or packages; a pin's
-  `unused: "must"` means it must be driven or tied (no internal pull), `pull` means a resistor is
+  a pin whose own voltage limit differs from its domain's (I2C pins rated 1.98 V, a sense pin rated
+  BATT+0.3 V) gets `vmax` (recommended maximum) and `absmax` (absolute maximum) on the pin, never an
+  `x.` key, so the checks see it; `unused: "must"` means it must be driven or tied (no internal pull), `pull` means a resistor is
   recommended.
 - If a value depends on the ordering code (temperature grade, output voltage option), fill it for
   **this** part number and say so in `cond`.
@@ -70,7 +73,9 @@ only if Chris asks, and only from the manufacturer's own site.
 2. **Start the file.**
    - If an exported file was given, start from it: keep its `id`, `mpn`, `match`, pins (numbers
      and names from the schematic), and any values a person already entered or verified (never
-     change a value that has `ok`).
+     change a value that has `ok`, or one with `src` "hand"). Values with `src` "schematic parameter" or
+     "import:cubemx" came from a library or database, not the datasheet: where the datasheet differs,
+     replace them (`src` "llm", with the page) and say what they were in `note`.
    - **STM32:** run the CubeMX importer first; it adds the pins, every alternate function with its AF
      number, EXTI lines, and the CubeMX supply range:
 
@@ -104,7 +109,7 @@ only if Chris asks, and only from the manufacturer's own site.
    - `num`, `name` (keep the schematic's name if the file came with pins; if they differ beyond
      formatting, keep both by putting the datasheet's in `note` and report it);
    - `role` (from `part.js kinds`): power-in, power-out, ground, io, input, output, open-drain, analog,
-     clock-in, clock-out, reset, boot, enable, feedback, switch, bootstrap, power-good, nc, dnc, pad, other;
+     clock-in, clock-out, reset, boot, enable, feedback, switch, bootstrap, power-good, bus (CAN, RS-485, RS-232, or USB data lines, which take the bus limits, not the domain's logic levels), nc, dnc, pad, other;
    - `domain`: which supply powers this I/O pin, or which domain a power pin belongs to;
    - `ft: true` only where the datasheet marks the pin 5 V tolerant (FT, TT…); never by guess;
    - `functions`: alternate functions, interface roles (`I2C SDA`, `UART TX`), EXTI, ADC channels;

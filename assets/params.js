@@ -28,7 +28,7 @@
     'power-in': 'Power in', 'power-out': 'Power out', ground: 'Ground', io: 'Digital I/O', input: 'Digital input', output: 'Digital output',
     'open-drain': 'Open drain', analog: 'Analog', 'clock-in': 'Clock or crystal in', 'clock-out': 'Clock or crystal out', reset: 'Reset',
     boot: 'Boot or strap', enable: 'Enable', feedback: 'Feedback', switch: 'Switch node', bootstrap: 'Bootstrap', 'power-good': 'Power good',
-    nc: 'No connect (may be tied)', dnc: 'Do not connect', pad: 'Exposed pad', other: 'Other'
+    bus: 'Bus line (CAN, RS-485, RS-232, USB data)', nc: 'No connect (may be tied)', dnc: 'Do not connect', pad: 'Exposed pad', other: 'Other'
   };
 
   const C = [];
@@ -120,7 +120,7 @@
     { k: 'reg.pg', label: 'Power good output type', unit: '', shape: 'text', on: 'part', hint: 'Open drain needs a pull-up' },
     { k: 'reg.vfb.absmax', label: 'FB pin absolute maximum', unit: 'V', shape: 'value', on: 'part' }
   ]);
-  add('Switch or protection', ['switch', 'power', 'driver'], [
+  add('Switch or protection', ['switch', 'power', 'driver', 'logic', 'analog'], [
     { k: 'sw.vin', label: 'Input range', unit: 'V', shape: 'range', on: 'part' },
     { k: 'sw.ron', label: 'On resistance', unit: 'Ω', shape: 'range', on: 'part' },
     { k: 'sw.iout', label: 'Continuous current, maximum', unit: 'A', shape: 'value', on: 'part' },
@@ -219,7 +219,7 @@
     { k: 'reg.rt', label: 'Timing or frequency resistor formula', unit: '', shape: 'text', on: 'part' },
     { k: 'reg.eff', label: 'Efficiency at the operating point', unit: '%', shape: 'value', on: 'part' }
   ]);
-  add('Switch or protection', ['switch', 'power', 'driver'], [
+  add('Switch or protection', ['switch', 'power', 'driver', 'logic', 'analog'], [
     { k: 'sw.vin.absmax', label: 'Input absolute maximum', unit: 'V', shape: 'value', on: 'part' },
     { k: 'sw.cload', label: 'Load capacitance, maximum (inrush)', unit: 'F', shape: 'value', on: 'part' },
     { k: 'sw.reverse', label: 'Reverse blocking', unit: '', shape: 'text', on: 'part' },

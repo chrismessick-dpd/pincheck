@@ -12,6 +12,12 @@ the suite's hard rules.
   library under `parts/`). No other tool links to Pincheck yet (Chris).
 - Built: SchDoc, Protel2, and KiCad XML reading, part identification, the library (IndexedDB, sync), the part
   window, the 201-key catalog, the CubeMX importer, `tools/part.js`, the `pincheck-part` skill, the demo.
+- **Library (2026-11-13, Chris: fill parts as designs are tried, including every part in stored Fabcheck
+  runs):** 53 part files in `pincheck_data` (`a11d419`), all unverified, made with the `pincheck-part` skill
+  (STM32s from CubeMX first). Sources: the parts of the two Altium test projects and the BOMs of the EE repos'
+  stored fab packages. Datasheets are in `C:\Dovetail\datasheets` (downloaded from the makers' sites at Chris's
+  OK). Not filled (no official datasheet reached): ROHM LMR1901YG-M, 3PEAK TPT75176A, PUI SMT-0827-S-HT-R, and
+  NDK MU00525; two crystal symbols name no part number (`WE-XTAL_CFPX-180`, `WE-XTAL_IQXC-42`).
 - Not built: the checks, zip drop. Altium nets come from the Protel2 netlist (`assets/protel.js`). See `docs/design.md`, *Not built yet*.
 
 ## Rules

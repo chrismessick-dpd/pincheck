@@ -101,5 +101,7 @@ body.pk-dragging .pk-dropzone { display: grid; }
   .grid-4.pk-stats { grid-template-columns: repeat(2, 1fr); }
 }
 .pk-pins td:nth-child(9) .input { width: 130px; }
+.pk-vmax { white-space: nowrap; }
+.pk-vmax .input { width: 64px; display: inline-block; margin-right: 4px; }
 .pk-pins td:nth-child(7) .input, .pk-pins td:nth-child(8) .input { width: 118px; }
 .pk-vnote { font-size: 11.5px; color: var(--text-2); margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--hair-2); }

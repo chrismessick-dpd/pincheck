@@ -86,7 +86,7 @@
       const bad = new Map(mism.map(m => [String(m.num), m]));
       return (mism.length ? '<div class="hint pk-warnbox"><b>▲ Pins differ from the schematic symbol (' + mism.length + ')</b>' + mism.slice(0, 8).map(m => 'Pin ' + esc(m.num) + ': schematic ' + (m.sch == null ? '(none)' : '“' + esc(m.sch) + '”') + ', file ' + (m.file == null ? '(none)' : '“' + esc(m.file) + '”')).join('<br>') + (mism.length > 8 ? '<br>…and ' + (mism.length - 8) + ' more' : '') + '</div>' : '') +
         '<div class="pk-ed-tools"><input class="input" data-id="pin-filter" placeholder="Filter pins (number, name, role, or function)" value="' + esc(st.pinFilter) + '"><span class="pk-muted">' + rows.length + ' of ' + f.pins.length + '</span><button class="btn btn-sm" data-ed="add-pin">Add pin</button></div>' +
-        '<div class="pk-scroll"><table class="table pk-pins"><thead><tr><th>Pin</th><th>Name</th><th>Role</th><th>Domain</th><th title="5 V tolerant">5 V tol.</th><th>Functions (alternate functions, EXTI, ADC…)</th><th>At reset</th><th>If unused</th><th title="An external part the datasheet requires on this pin">Needs</th><th></th></tr></thead><tbody>' +
+        '<div class="pk-scroll"><table class="table pk-pins"><thead><tr><th>Pin</th><th>Name</th><th>Role</th><th>Domain</th><th title="5 V tolerant">5 V tol.</th><th>Functions (alternate functions, EXTI, ADC…)</th><th>At reset</th><th>If unused</th><th title="An external part the datasheet requires on this pin">Needs</th><th title="Voltage limits of this pin alone, where they differ from its domain: recommended maximum, then absolute maximum (numbers or expressions like VDD+0.3)">Max V (rec. / abs.)</th><th></th></tr></thead><tbody>' +
         rows.map(([p, i]) => '<tr data-pin="' + i + '"' + (bad.has(String(p.num)) ? ' class="pk-mism"' : '') + '><td><input class="input pk-in-num" data-pf="num" value="' + esc(p.num) + '"></td><td><input class="input" data-pf="name" value="' + esc(p.name) + '"></td>' +
           '<td><select class="input" data-pf="role">' + Object.entries(P.ROLES).map(([k, l]) => '<option value="' + k + '"' + (p.role === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></td>' +
           '<td><select class="input" data-pf="domain">' + domOpts(p.domain) + '</select></td>' +
@@ -95,6 +95,7 @@
           '<td><select class="input" data-pf="reset">' + Object.entries(P.RESET_STATES).map(([k, l]) => '<option value="' + k + '"' + ((p.reset || '') === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></td>' +
           '<td><select class="input" data-pf="unused">' + Object.entries(P.UNUSED).map(([k, l]) => '<option value="' + k + '"' + ((p.unused || '') === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></td>' +
           '<td><input class="input pk-in-ext" data-pf="ext" value="' + esc(p.ext || '') + '" placeholder="' + (p.role === 'power-out' || p.role === 'power-in' ? '4.7 µF to GND' : '') + '"></td>' +
+          '<td class="pk-vmax"><input class="input" data-pf="vmax" value="' + esc(p.vmax == null ? '' : p.vmax) + '" placeholder="rec."><input class="input" data-pf="absmax" value="' + esc(p.absmax == null ? '' : p.absmax) + '" placeholder="abs."></td>' +
           '<td><button class="icon-btn" data-ed="del-pin" title="Remove this pin" aria-label="Remove pin">×</button></td></tr>').join('') +
         '</tbody></table></div>';
     }
@@ -198,6 +199,7 @@
         if (t.dataset.pf === 'functions') p.functions = t.value.split(',').map(s => s.trim()).filter(Boolean);
         else if (t.dataset.pf === 'ft') { if (t.checked) p.ft = true; else delete p.ft; }
         else if (['domain', 'reset', 'unused', 'ext'].includes(t.dataset.pf)) { if (t.value.trim()) p[t.dataset.pf] = t.value.trim(); else delete p[t.dataset.pf]; }
+        else if (t.dataset.pf === 'vmax' || t.dataset.pf === 'absmax') { const v = t.value.trim(), n = P.parseNum(v, 'V'); if (!v) delete p[t.dataset.pf]; else p[t.dataset.pf] = n != null ? n : v; }
         else p[t.dataset.pf] = t.value;
         st.dirty = true; return;
       }
