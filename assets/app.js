@@ -73,6 +73,7 @@
       const d = await D.build(sch);
       if (!d.parts.length) throw new Error('No parts found in ' + sch.map(f => f.name).join(', '));
       d.id = 'd' + Date.now().toString(36);
+      d.scanPlay = true; // its Overview plays the scan panel once (assets/scan.js)
       state.designs.unshift(d); state.active = d.id; state.view = 'design'; state.tab = 'overview'; state.check = ''; state.q = ''; state.openFinding = null;
       if (d.notes.length) d.notes.forEach(n => console.info('Pincheck:', n));
     } catch (e) { toast(e.message, 'error'); state.view = active() ? 'design' : 'home'; }
@@ -168,8 +169,8 @@
   function renderTabs() {
     const seg = $('#view-seg'), d = active();
     if (state.view !== 'design' || !d || state.busy) { seg.hidden = true; return; }
-    const run = ensureRun(d), c = PK.pages.counts(run.findings.filter(f => !f.waived));
-    const tabs = [['overview', 'Overview', ''], ['findings', 'Findings', c.error || c.warn ? '<span class="count">' + (c.error ? '✕ ' + c.error + ' ' : '') + (c.warn ? '▲ ' + c.warn : '') + '</span>' : ''], ['parts', 'Parts', '']];
+    const run = ensureRun(d), c = PK.pages.counts(run.findings.filter(f => !f.waived)), playing = scanning(d);
+    const tabs = [['overview', 'Overview', ''], ['findings', 'Findings', !playing && (c.error || c.warn) ? '<span class="count">' + (c.error ? '✕ ' + c.error + ' ' : '') + (c.warn ? '▲ ' + c.warn : '') + '</span>' : ''], ['parts', 'Parts', '']];
     if (PK.viewer) tabs.splice(2, 0, ['schematic', 'Schematic', '']);
     seg.hidden = false;
     seg.innerHTML = tabs.map(([k, l, x]) => '<button role="tab" data-tab="' + k + '" class="' + (state.tab === k ? 'on' : '') + '">' + l + x + '</button>').join('');
@@ -211,16 +212,30 @@
       if (state.tab === 'findings') v.innerHTML = PK.pages.findings(d, ensureRun(d), ctx);
       else if (state.tab === 'parts') v.innerHTML = designPage(d);
       else if (state.tab === 'schematic' && PK.viewer) { ensureRun(d); PK.viewer.render(v, d, state); }
-      else v.innerHTML = PK.pages.overview(d, ensureRun(d), ctx);
+      else {
+        const run = ensureRun(d);
+        ctx.scan = !!(PK.scan && d.sheetsDrawn);
+        ctx.scanning = ctx.scan && scanning(d);
+        v.innerHTML = PK.pages.overview(d, run, ctx);
+        const host = $('#pk-scan-host');
+        if (host) {
+          const play = !!d.scanPlay; d.scanPlay = false;
+          PK.scan.attach(host, d, run, { lib: state.lib, play, onDone: () => { renderTabs(); if (state.view === 'design' && active() === d && state.tab === 'overview') renderView(); } });
+        }
+      }
       return;
     }
     v.innerHTML = homePage();
   }
 
+  // A design's scan panel is playing, or about to (its Overview hasn't drawn yet).
+  const scanning = d => !!(PK.scan && d && d.sheetsDrawn && (d.scanPlay || PK.scan.running(d)));
+
   function homePage() {
     return '<div class="page"><div class="eyebrow">Prototype</div><h1 class="page-title">Pincheck</h1>' +
       '<p class="pk-lede">Checks a schematic against what each part allows: supply ranges, I/O levels, pin functions, and more. It starts by finding the ICs and looking each one up in the part library. Parts it doesn\'t know yet get a part file, which you fill in by hand or with Claude from the datasheet.</p>' +
-      '<button class="card pk-drop" data-act="open"><span class="pk-drop-ico">' + ICON.drop + '</span><b>Drop schematic sheets or a netlist</b><span class="pk-muted">Altium: every .SchDoc of the project, with its Protel2 netlist (Design › Netlist For Project › Protel2) for the nets. KiCad: the XML netlist. Read in this tab and never uploaded.</span></button>' +
+      (PK.scan ? PK.scan.emptyHtml('Altium: every .SchDoc of the project, with its Protel2 netlist (Design › Netlist For Project › Protel2) for the nets. KiCad: the XML netlist. Drop them anywhere on this window, or click here to choose. Read in this tab and never uploaded.')
+        : '<button class="card pk-drop" data-act="open"><span class="pk-drop-ico">' + ICON.drop + '</span><b>Drop schematic sheets or a netlist</b><span class="pk-muted">Altium: every .SchDoc of the project, with its Protel2 netlist (Design › Netlist For Project › Protel2) for the nets. KiCad: the XML netlist. Read in this tab and never uploaded.</span></button>') +
       (DEMO ? '' : '<div class="pk-demo-row"><a class="btn" href="?demo">Try the demo</a><span class="pk-muted">The made-up Smart Thermostat\'s Main PCBA, with a small library.</span></div>') +
       '<div class="grid grid-3" style="margin-top:22px">' +
       what('1. Find the parts', 'Every IC, crystal, and other active part, with its part number from the schematic\'s parameters, Comment, or library reference.') +
@@ -321,7 +336,7 @@
     else if (a === 'library') { state.view = 'library'; $('#app').classList.remove('nav-open'); renderAll(); }
     else if (a === 'theme') { const t2 = isDark(readTheme()) ? 'light' : 'dark'; writeTheme(t2); applyTheme(t2); }
     else if (a === 'sync') syncNow();
-    else if (a === 'rerun') { const d = active(); if (d) { d.run = null; ensureRun(d); renderTabs(); renderView(); toast('Checked again: ' + d.run.findings.length + ' findings'); } }
+    else if (a === 'rerun') { const d = active(); if (d) { d.run = null; ensureRun(d); if (PK.scan && d.sheetsDrawn && state.tab === 'overview') d.scanPlay = true; else toast('Checked again: ' + d.run.findings.length + ' findings'); renderTabs(); renderView(); } }
     else if (a === 'import') PK.editor.pickJson((text, name) => importJson(text, name));
     else if (a === 'export-all') { const b = new Blob([JSON.stringify(state.lib.map(L.strip), null, 2) + '\n'], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = 'pincheck-library.json'; l.click(); setTimeout(() => URL.revokeObjectURL(l.href), 1500); }
     else if (a === 'new-part') { const mpn = prompt('Part number'); if (mpn && mpn.trim()) editPart({ schema: L.SCHEMA, id: L.slug(mpn), mpn: mpn.trim(), match: [], manufacturer: '', kind: 'ic', description: '', package: '', datasheet: {}, pins: [], domains: [], values: [], made: { by: who(), at: new Date().toISOString(), how: 'by hand' } }, null, true); }

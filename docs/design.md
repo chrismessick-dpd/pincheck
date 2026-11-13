@@ -133,6 +133,46 @@ Chris asked for a viewer like Fabcheck's Board that jumps to the findings on the
   Pincheck but untested in Altium), from the same parts and nets as the KiCad netlist. Both demos give the same
   findings (a test).
 
+## The scan panel (2026-11-13)
+
+Chris asked for Fabcheck's inspection stage for schematics: a live picture of what's being checked. It was
+designed in `lab/scan-panel.html`, where three directions were tried: a sheet gallery, a sheet stack, and a
+part close-up. Chris chose the gallery and shaped it over five rounds. `assets/scan.js` and the *scan panel*
+section of `assets/styles.css` build it.
+
+- **Where:** at the top of a design's Overview, as Fabcheck's stage. While it plays, the totals show "–"
+  and Findings' tab count waits, as Fabcheck's do.
+- **What:** every sheet as a thumbnail, drawn from `design.drawings` without text. The thumbnails sit in
+  equal columns at least 208 px wide that fill the space left of the words, with a short last row
+  centered. Card widths come from the panel's width alone, so they never move during a run.
+- **While it runs:**
+  - Each check reads every sheet it touches at once (a lane per sheet). Dots pop in and fade over the pins
+    it reads.
+  - What has been read stays as small solid dots.
+  - A sheet being read pulses its outline and shows a ● by its number. With reduced motion, the pulse is a
+    steady ring.
+  - Findings land as marks: ✕ in a striped square, ▲ dotted, and i in a ring. A click on one opens it on
+    the Schematic tab (`data-show`).
+  - The words on the right say which check is running and which part it's reading.
+- **The bar:** Fabcheck's, with each check's start ticked and checks that found something hatched. A click
+  while it plays skips to the end.
+- **Replaying one check:** once the run is done, the bar is a slider of the 25 checks.
+  - Press and slide, or use the arrow keys, Home, and End.
+  - The picked check plays again in a loop, its findings listed on the right.
+  - Escape, or *Back to all results*, returns to the finished run.
+- **When it plays:** when a design opens, and on *Run checks again* (`d.scanPlay`). It doesn't play on a
+  library change; the panel is rebuilt finished.
+- **Only with sheets:** a netlist alone (KiCad, or Protel2 without the .SchDoc files) gets no panel, as
+  Fabcheck shows no stage without a board (Chris).
+- **The start page:** an empty panel is the drop target. Click it, press Enter, or drop files anywhere.
+- **A replay, about 8 s (Chris):** the checks finish in milliseconds, so the panel plays the finished run.
+  Each check gets a share of the 8 s by how much it reads, and a busy sheet groups its parts so it has at
+  most 8 beats per check.
+- **Guessed, not traced:** what each check reads is worked out in `scan.js` (`plan`, `TARGETS`) from pin
+  roles, part kinds, net names, and `run.coverage`. Only the findings' places are exact (their `pins`,
+  `refs`, and `nets`). Next step: have `checks.js` record the pins and parts at its `tick()` calls behind
+  an option, and draw those instead.
+
 ## Not built yet
 
 - Nets derived from SchDoc files without a netlist (not planned while Protel2 works).

@@ -28,6 +28,11 @@ the suite's hard rules.
   on a canvas (sheet tabs, pan and zoom, hover names, a findings rail, marks at each finding's pins). See
   `docs/design.md`, *The schematic viewer*. The demo is now Altium sheets and a Protel2 netlist made by
   `tools/make_demo_altium.py` (with `tools/schdoc_write.py`), beside the KiCad netlist.
+- **Scan panel (2026-11-13, Chris: Fabcheck's stage for schematics, the gallery chosen from three in
+  `lab/scan-panel.html`; built, not committed):** `assets/scan.js` leads a design's Overview when it has sheet
+  drawings. Every sheet is a thumbnail, all running at once during an 8 s replay of the run. Findings land
+  as marks, and the finished bar is a slider to replay one check. The start page's empty panel is the drop
+  target. See `docs/design.md`, *The scan panel*.
 - Not built: zip drop. Altium nets come from the Protel2 netlist (`assets/protel.js`). See `docs/design.md`, *Not built yet*.
 
 ## Rules
@@ -54,7 +59,7 @@ the suite's hard rules.
 1. `python tools/make_demo.py` if the demo changed.
 2. `python tools/stamp_version.py`.
 3. Serve the tools folder (preview `signoff-suite-alt`, port 8774) and open `pincheck/tests/test.html`:
-   PASS (29 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
+   PASS (31 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
    three sheets.
 4. In the browser pane, scripts are cached: fetch changed files with `{cache: 'reload'}` first. The demo
    library is loaded into IndexedDB `pincheck-demo` once; delete that database to reload it.

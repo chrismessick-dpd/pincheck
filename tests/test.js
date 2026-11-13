@@ -307,6 +307,30 @@
     ok(/No drawing in a KiCad netlist/.test(el.textContent));
   });
 
+  t('scan panel: a step per check, about 8 s, every located finding on its sheet', () => {
+    const run = PK.checks.run(alt, lib);
+    const G = PK.scan.geometry(alt), P = PK.scan.plan(alt, run, lib, G);
+    eq(G.sheets.length, 3);
+    eq(P.steps.map(s => s.key), PK.checks.CATALOG.map(c => c.key));
+    ok(Math.abs(P.total - PK.scan.TOTAL) < 1, 'total ' + P.total);
+    ok(P.steps.every(s => s.lanes.every(l => l.beats.length <= 8)), 'at most 8 beats per sheet');
+    ok(G.pinAt.get('U4.4') && G.pinAt.get('U4.4')[0].sheet === 1, 'U4 VDD on the MCU sheet');
+    const placed = P.steps.flatMap(s => [...s.at.values()]).filter(Boolean).length;
+    eq(placed, run.findings.filter(f => !f.waived).length, 'every finding has a place');
+    // The run as a whole: done at the end, every finding shown; a picked check shows its own from the start.
+    const end = PK.scan.stateAt(P, P.total);
+    eq([end.done, end.findings.length], [true, run.findings.length]);
+    const uart = P.steps.findIndex(s => s.key === 'func.uart');
+    const S = PK.scan.pickAt(P, uart, 0);
+    ok(P.steps[uart].findings.every(f => S.findings.includes(f)) && S.lanes.length > 0, 'a replayed check');
+  });
+  t('scan panel: none for a design without sheets', () => {
+    const host = document.createElement('div'), wrap = document.createElement('div');
+    wrap.appendChild(host);
+    eq(PK.scan.attach(host, design, PK.checks.run(design, lib), { lib }), null);
+    eq(wrap.children.length, 0);
+  });
+
   for (const [name, fn] of tests) {
     try { await fn(); out.push('✓ ' + name); } catch (e) { fails.push(name); out.push('✕ ' + name + '\n    ' + e.message); }
   }

@@ -1,0 +1,308 @@
+/* Pincheck lab: the scan panel (scan-panel.js). Suite tokens from ../assets/suite.css; the glow is this
+   panel's own, as Fabcheck's --stk-glow is Fabcheck's. Severity is never hue alone: ✕ in a striped square,
+   ▲ dotted, i in a ring; a checked pin is a small solid dot, an unchecked one a hollow ring, a part with
+   no file dashed. */
+:root { --sp-glow: #1e9bff; --sp-paper: #ffffff; --sp-ink: #8a8f98; --sp-ink-2: #5f646c; --sp-ok: #00727f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sp-glow: #4cc2ff; --sp-paper: #121417; --sp-ink: #5c6470; --sp-ink-2: #9aa3ae; --sp-ok: #3fc1cf; } }
+:root[data-theme="dark"] { --sp-glow: #4cc2ff; --sp-paper: #121417; --sp-ink: #5c6470; --sp-ink-2: #9aa3ae; --sp-ok: #3fc1cf; }
+
+.sp-body { background: var(--bg); color: var(--text); font-family: var(--sans); margin: 0; }
+.sp-lab-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px 24px; padding: 22px 24px 12px; max-width: 1240px; margin: 0 auto; }
+.sp-lab-head .eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-ink); }
+.sp-lab-head .page-title { font: 600 26px/1.2 var(--display); margin: 4px 0 4px; }
+.sp-lab-note { margin: 0; font-size: 13px; color: var(--text-2); max-width: 640px; }
+.sp-lab-ctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sp-lab-ctl .seg { display: inline-flex; background: var(--bg-sunk); border-radius: 9px; padding: 2px; }
+.sp-lab-ctl .seg button { font: 500 12.5px var(--sans); color: var(--text-2); background: none; border: 0; border-radius: 7px; padding: 6px 11px; cursor: pointer; }
+.sp-lab-ctl .seg button[aria-pressed="true"] { background: var(--bg-elev); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.sp-main { max-width: 1240px; margin: 0 auto; padding: 0 24px 40px; }
+.sp-panel { background: var(--bg-elev); border-radius: 16px; border: 1px solid var(--hair); padding: 18px 22px 20px; overflow: hidden; }
+.sp-muted { color: var(--text-3); }
+
+/* The progress bar (Fabcheck's, simplified). */
+.sp-prog { margin: -18px -22px 12px; padding: 14px 22px 10px; border-bottom: 1px solid var(--hair); }
+.sp-bar { position: relative; height: 5px; border-radius: 5px; background: var(--bg-sunk); }
+.sp-fill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, var(--accent), var(--sp-glow)); border-radius: inherit; }
+.sp-run { position: absolute; left: 0; top: 0; bottom: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.sp-run s { position: absolute; inset: 0; }
+.sp-run s::after { content: ""; position: absolute; top: 0; bottom: 0; width: 60px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent); animation: sp-sweep 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+@keyframes sp-sweep { from { transform: translateX(-60px); } to { transform: translateX(1200px); } }
+.sp-prog.done .sp-fill { background: var(--pass); }
+.sp-prog.done .sp-run { display: none; }
+.sp-steps { position: absolute; inset: 0; pointer-events: none; }
+.sp-steps span { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--bg-elev); opacity: 0.75; }
+.sp-steps span.m0 { top: -3px; bottom: -3px; width: 2px; background: var(--text-3); opacity: 0.5; }
+.sp-steps b { position: absolute; top: 0; bottom: 0; border-radius: 1px; opacity: 0.9; }
+.sp-steps b.w { background: var(--warn-fill-hatch), var(--warn); }
+.sp-steps b.e { background: var(--issue-fill-hatch), var(--issue); }
+.sp-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.sp-c { margin-right: 10px; white-space: nowrap; }
+.sp-c b { font-weight: 400; font-size: 9px; vertical-align: 1px; margin-right: 3px; }
+.sp-c.e b { color: var(--issue); } .sp-c.w b { color: var(--warn); } .sp-c.i b { color: var(--text-3); font-style: italic; font-family: Georgia, serif; font-size: 11px; }
+.sp-ok { color: var(--pass); }
+
+/* The step's words. */
+.sp-eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+.sp-title { font: 600 19px/1.25 var(--display); margin: 4px 0 6px; }
+.sp-desc { font-size: 13px; line-height: 1.45; color: var(--text-2); min-height: 2.9em; }
+.sp-now { color: var(--text); }
+
+/* Sheet drawing (in sheet units). */
+.sp-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.sp-paper { fill: var(--sp-paper); stroke: var(--hair-2); stroke-width: 2; }
+.sp-frame { fill: none; stroke: var(--sp-ink); stroke-width: 1.2; opacity: 0.6; }
+.sp-tb { font: 600 22px var(--sans); fill: var(--sp-ink-2); }
+.sp-wire { fill: none; stroke: var(--sp-ink); stroke-width: 2; opacity: 0.8; }
+.sp-part .sp-body { fill: none; stroke: var(--sp-ink-2); stroke-width: 2; }
+.sp-part.ic .sp-body { fill: var(--accent-soft, rgba(0, 114, 127, 0.07)); stroke-width: 2.4; }
+.sp-part.nofile .sp-body { stroke-dasharray: 8 6; fill: none; }
+.sp-pin { stroke: var(--sp-ink-2); stroke-width: 1.6; }
+.sp-ref { font: 600 13px var(--mono); fill: var(--sp-ink-2); }
+.sp-ref.big { font-size: 17px; }
+.sp-net { font: 500 11px var(--mono); fill: var(--sp-ink); }
+.sp-port { fill: none; stroke: var(--sp-ink); stroke-width: 1.8; }
+/* A pin's dot: a hollow ring until a check has read it, then small and solid (shape, not just color). */
+.sp-pd { fill: var(--sp-paper); stroke: var(--sp-ink); stroke-width: 1; opacity: 0.55; transition: r 0.3s var(--ease), opacity 0.3s; }
+.sp-pd.ok { fill: var(--sp-ok); stroke: none; opacity: 0.85; }
+.sp-part.ok .sp-body { stroke: var(--sp-ok); }
+.sp-part.ic.nofile.ok .sp-body { stroke: var(--sp-ink-2); }
+
+/* A scan dot: pops in at the pin, rings out, and fades. */
+.sp-pop .pp-core { fill: var(--sp-glow); animation: sp-pop 0.95s var(--ease) both; }
+.sp-pop .pp-ring { fill: none; stroke: var(--sp-glow); stroke-width: 1.4; animation: sp-ring 0.95s ease-out both; transform-box: fill-box; transform-origin: center; }
+.sp-pop { animation: sp-life 0.95s linear both; }
+.sp-pop.frozen, .sp-pop.frozen * { animation-play-state: paused; }
+@keyframes sp-pop { 0% { transform: scale(0); opacity: 0; } 25% { transform: scale(1.35); opacity: 1; } 55% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.7); opacity: 0; } }
+@keyframes sp-ring { 0% { transform: scale(0.3); opacity: 0.9; } 100% { transform: scale(1.4); opacity: 0; } }
+@keyframes sp-life { to { opacity: 1; } }
+.sp-pop .pp-core { transform-box: fill-box; transform-origin: center; }
+.sp-fx { pointer-events: none; }
+
+/* Finding marks. */
+.sp-mark .mk-shape { stroke-width: 1.6; }
+.sp-mark.sev-error .mk-shape { stroke: var(--issue); }
+.sp-mark.sev-warn .mk-shape { stroke: var(--warn); stroke-linejoin: round; }
+.sp-mark.sev-info .mk-shape { fill: var(--bg-elev); stroke: var(--text-3); }
+.sp-mark .mk-glyph { fill: none; stroke-width: 2.2; stroke-linecap: round; }
+.sp-mark.sev-error .mk-glyph { stroke: var(--issue); }
+.sp-mark.sev-warn .mk-glyph { stroke: var(--text); }
+.sp-mark.sev-info .mk-glyph { stroke: var(--text-2); }
+.sp-hf-e { fill: var(--bg-elev); } .sp-hl-e { stroke: var(--issue); stroke-width: 1.4; opacity: 0.55; }
+.sp-hf-w { fill: var(--bg-elev); } .sp-hl-w { fill: var(--warn); opacity: 0.8; }
+.sp-mark.land { animation: sp-land 0.5s cubic-bezier(0.25, 1.4, 0.5, 1) both; transform-box: fill-box; transform-origin: center; }
+@keyframes sp-land { from { opacity: 0; scale: 1.8; } to { opacity: 1; scale: 1; } }
+
+/* A · Sheet gallery. */
+.sp-cap { margin-bottom: 14px; min-height: 92px; }
+.sp-gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.sp-card { margin: 0; border-radius: 12px; background: var(--bg-sunk); padding: 10px 10px 8px; border: 1px solid var(--hair); transition: box-shadow 0.3s var(--ease), transform 0.3s var(--ease); }
+.sp-card.on { box-shadow: 0 0 0 2px var(--sp-glow), 0 6px 22px rgba(30, 155, 255, 0.18); transform: translateY(-2px); }
+.sp-card figcaption { display: flex; align-items: baseline; gap: 6px; margin-top: 8px; font-size: 13px; font-weight: 600; }
+.sp-card-n { color: var(--text-3); font-weight: 500; }
+.sp-card-c { margin-left: auto; font-weight: 400; font-size: 12px; }
+.sp-card-tag { display: none; font: 600 10.5px var(--sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--sp-glow); }
+.sp-card.on .sp-card-tag { display: inline; }
+.sp-card.on .sp-card-c:empty + .sp-card-tag { margin-left: auto; }
+
+/* B · Stack, and the stage both B and C use. */
+.sp-stage { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr); gap: 8px 28px; align-items: center; }
+@media (max-width: 860px) { .sp-stage { grid-template-columns: 1fr; } }
+.sp-stack .sp-layer { transition: opacity 0.4s var(--ease), transform 0.5s var(--ease); }
+.sp-stack .sp-paper { stroke-width: 3; }
+.sp-stage.is-running .sp-layer:not(.on) { opacity: 0.55; }
+.sp-stack .sp-paper { fill: var(--sp-paper); filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.12)); }
+.sp-stage.is-running .sp-layer.on { transform: translateY(-22px); }
+.sp-stage.is-running .sp-layer.on .sp-paper { stroke: var(--sp-glow); stroke-width: 5; filter: drop-shadow(0 0 6px var(--sp-glow)); }
+.sp-lbl { font: 500 12px var(--sans); fill: var(--text-3); }
+.sp-layer.on .sp-lbl { fill: var(--text); font-weight: 600; }
+.sp-stem { stroke: var(--text-3); stroke-width: 1; }
+.sp-foot { fill: var(--text-2); }
+.sp-pinmark.drop { animation: sp-drop 0.55s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+@keyframes sp-drop { from { transform: translateY(-26px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sp-detail { margin-top: 14px; min-height: 118px; }
+.sp-fig { display: block; width: 100%; max-width: 290px; height: auto; animation: sp-fig 0.35s var(--ease); }
+@keyframes sp-fig { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.sp-fig .d-track { fill: var(--bg-sunk); }
+.sp-fig .d-band { fill: var(--pass); opacity: 0.35; }
+.sp-fig .d-abs { stroke: var(--issue); stroke-width: 2; stroke-dasharray: 3 2; }
+.sp-fig .d-needle { stroke: var(--sp-glow); stroke-width: 2.4; }
+.sp-fig .d-needle.bad { stroke: var(--issue); stroke-width: 3; }
+.sp-fig .d-arrow { fill: var(--sp-glow); }
+.sp-fig .d-cap { font: 500 10.5px var(--sans); fill: var(--text-2); text-anchor: middle; }
+.sp-fig .d-cap.l { text-anchor: start; }
+.sp-fig .d-cap.b { font-weight: 700; fill: var(--text); }
+.sp-fig .d-body { fill: var(--bg-sunk); stroke: var(--text-3); }
+.sp-fig .d-pin, .sp-fig .d-wire { stroke: var(--text-3); stroke-width: 1.6; fill: none; }
+.sp-fig .d-hot { stroke: var(--sp-glow); stroke-width: 3; fill: none; }
+.sp-fig .d-hotdot { fill: var(--sp-glow); }
+.sp-figtext { font-size: 13px; color: var(--text-2); }
+.sp-rails { display: grid; gap: 4px; }
+.sp-rail, .sp-tr { display: grid; grid-template-columns: 64px 64px 1fr; gap: 8px; align-items: baseline; font-size: 12.5px; padding: 3px 0; border-bottom: 1px solid var(--hair); }
+.sp-rail-v, .sp-tr-v { font: 600 13px var(--mono); }
+.sp-rail-n, .sp-tr-n { font: 500 12px var(--mono); color: var(--text-2); }
+.sp-rail-f, .sp-tr-f { color: var(--text-3); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* C · Close-up. */
+.sp-cu-art { min-width: 0; }
+.sp-cu-pkg { background: var(--bg-sunk); border-radius: 12px; padding: 6px; }
+.sp-pkgsvg { max-height: 380px; }
+.cu-body { fill: #24272b; stroke: #3a3f45; stroke-width: 2; }
+:root[data-theme="dark"] .cu-body { fill: #0d0e10; stroke: #3a3f45; }
+.cu-body.nofile { fill: none; stroke: var(--text-3); stroke-dasharray: 8 6; }
+.cu-dot1 { fill: #4a4f56; }
+.cu-ref { font: 700 22px var(--mono); fill: #e6e8eb; text-anchor: middle; }
+.cu-mpn { font: 500 11.5px var(--mono); fill: #9aa3ae; text-anchor: middle; }
+.cu-body.nofile ~ .cu-ref { fill: var(--text-2); }
+.cu-pin { stroke: #b8bcc2; stroke-width: 4; stroke-linecap: butt; }
+.cu-net { font: 500 9.5px var(--mono); fill: var(--text-2); }
+.cu-net.open { fill: var(--text-3); font-style: italic; }
+.sp-cu-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.sp-chip { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 120px; padding: 6px 10px; border-radius: 9px; border: 1px solid var(--hair-2); background: var(--bg-elev); color: var(--text); font: 12px var(--sans); text-align: left; cursor: default; position: relative; }
+.sp-chip b { font: 600 12.5px var(--mono); }
+.sp-chip span { font: 10.5px var(--mono); color: var(--text-3); }
+.sp-chip.on { box-shadow: 0 0 0 2px var(--sp-glow); border-color: transparent; }
+.sp-chip.nofile { border-style: dashed; }
+.sp-chip-c { position: absolute; top: 5px; right: 4px; font-style: normal; font-size: 11px; }
+.sp-chip-c .sp-c { margin-right: 4px; }
+.sp-tree { margin-top: 16px; }
+.sp-tree-h { margin-bottom: 6px; }
+.sp-tr { opacity: 0.4; transition: opacity 0.4s var(--ease); }
+.sp-tr .sp-tr-v::before { content: "○ "; color: var(--text-3); }
+.sp-tr.on { opacity: 1; }
+.sp-tr.on .sp-tr-v::before { content: "● "; color: var(--sp-glow); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-run s::after, .sp-mark.land, .sp-pinmark.drop, .sp-fig { animation: none; }
+  .sp-card, .sp-layer, .sp-pd, .sp-tr { transition: none; }
+  .sp-stage.is-running .sp-layer.on { transform: none; }
+}
+
+/* A · the spotlight beside the gallery. */
+.sp-galwrap { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 14px; align-items: start; }
+@media (max-width: 860px) { .sp-galwrap { grid-template-columns: 1fr; } .sp-galwrap .sp-gal { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+.sp-galwrap .sp-gal { grid-template-columns: 1fr; gap: 10px; }
+.sp-spot { position: relative; border-radius: 12px; background: var(--bg-sunk); padding: 10px; aspect-ratio: 1170 / 780; }
+.sp-spot-sheet { position: absolute; inset: 10px 10px 34px; opacity: 0; transition: opacity 0.45s var(--ease); }
+.sp-spot-sheet .sp-svg { height: 100%; width: 100%; }
+.sp-spot-sheet.on { opacity: 1; }
+.sp-spot-tag { position: absolute; left: 14px; right: 14px; bottom: 8px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; }
+.sp-spot-live { display: none; font: 600 10.5px var(--sans); letter-spacing: 0.04em; text-transform: uppercase; color: var(--sp-glow); align-self: center; }
+.sp-spot.live .sp-spot-live { display: inline; }
+.sp-spot.live .sp-spot-live::before { content: "● "; animation: sp-blink 1.2s steps(2) infinite; }
+@keyframes sp-blink { 50% { opacity: 0.2; } }
+.sp-galwrap .sp-card { padding: 7px 7px 6px; }
+.sp-galwrap .sp-card figcaption { font-size: 12px; margin-top: 5px; }
+.sp-galwrap .sp-card .sp-c { margin-right: 5px; }
+@media (prefers-reduced-motion: reduce) { .sp-spot-sheet { transition: none; } .sp-spot.live .sp-spot-live::before { animation: none; } }
+
+.sp-gal-side .sp-cap { min-height: 128px; margin-bottom: 10px; }
+.sp-gal-side .sp-title { font-size: 17px; }
+.sp-lab-head { padding-top: 14px; }
+.sp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* A · thumbnails of every sheet in rows below the large one (only with more than one sheet), each with its
+   own dots, so a check reading several sheets at once shows on all of them. About a fifth of the large
+   view's height. */
+.sp-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 10px; margin-top: 14px; }
+.sp-thumbs .sp-card { padding: 5px 5px 4px; border-radius: 9px; transform: none; }
+.sp-thumbs .sp-card-art { height: 112px; }
+.sp-thumbs .sp-card-art .sp-svg { height: 100%; width: 100%; }
+.sp-thumbs .sp-card figcaption { font-size: 11.5px; margin-top: 4px; gap: 4px; min-width: 0; }
+.sp-thumbs .sp-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sp-thumbs .sp-card .sp-c { margin-right: 4px; }
+.sp-thumbs .sp-card.busy:not(.on) { box-shadow: 0 0 0 1px var(--sp-glow); }
+.sp-thumbs .sp-card.busy .sp-card-n::before { content: "● "; color: var(--sp-glow); }
+
+/* B · standing sheets: the legend beside the deck names them; ● marks each sheet the check is reading. */
+.sp-lbl.on { fill: var(--text); font-weight: 600; }
+.sp-stage.is-running .sp-layer.busy:not(.on) { opacity: 0.85; }
+.sp-stage.is-running .sp-layer.busy:not(.on) .sp-paper { stroke: var(--sp-glow); stroke-width: 3; }
+.sp-thumbs .sp-card-n { white-space: nowrap; flex: none; }
+.sp-thumbs .sp-card figcaption { flex-wrap: nowrap; }
+
+/* A, round 3: thumbnails in a column on the left, the large sheet beside them, the check below it. */
+.sp-galwrap { grid-template-columns: minmax(0, 1fr); grid-template-areas: "spot" "cap"; gap: 12px 14px; }
+.sp-galwrap.multi { grid-template-columns: 184px minmax(0, 1fr); grid-template-areas: "thumbs spot" "thumbs cap"; }
+.sp-galwrap .sp-spot { grid-area: spot; }
+.sp-galwrap .sp-cap { grid-area: cap; min-height: 76px; margin: 0; padding: 0 4px; }
+.sp-galwrap .sp-cap .sp-desc { min-height: 0; }
+.sp-galwrap .sp-thumbs { grid-area: thumbs; display: flex; flex-direction: column; gap: 10px; margin: 0; align-self: stretch; max-height: 100%; overflow-y: auto; min-height: 0; padding: 2px; }
+.sp-galwrap .sp-thumbs .sp-card { flex: none; }
+@media (max-width: 860px) {
+  .sp-galwrap.multi { grid-template-columns: minmax(0, 1fr); grid-template-areas: "spot" "cap" "thumbs"; }
+  .sp-galwrap .sp-thumbs { flex-direction: row; overflow-x: auto; }
+  .sp-galwrap .sp-thumbs .sp-card { width: 160px; }
+}
+/* The column scrolls within the height of the large view and the check; it never makes the panel taller. */
+.sp-galwrap.multi .sp-thumbs { contain: size; }
+@media (max-width: 860px) { .sp-galwrap.multi .sp-thumbs { contain: none; } }
+
+/* A, round 4: a grid of every sheet, all running at once, and the check on the right. A sheet being read
+   pulses its outline (a steady ring with reduced motion); the ● beside its number says the same without motion. */
+.sp-galwrap.grid { display: grid; grid-template-columns: minmax(0, 1fr) 250px; grid-template-areas: none; gap: 14px 20px; align-items: start; }
+.sp-galwrap.grid .sp-cap { grid-area: auto; min-height: 0; padding: 4px 0 0; position: sticky; top: 12px; }
+.sp-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.sp-grid.n1 { grid-template-columns: minmax(0, 1fr); }
+.sp-grid.n2, .sp-grid.n4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sp-grid .sp-card { margin: 0; padding: 8px 8px 6px; border-radius: 12px; transform: none; box-shadow: none; transition: box-shadow 0.3s var(--ease); }
+.sp-grid .sp-card figcaption { font-size: 12.5px; margin-top: 6px; gap: 5px; flex-wrap: nowrap; min-width: 0; }
+.sp-grid .sp-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sp-grid .sp-card-n { white-space: nowrap; flex: none; }
+.sp-grid .sp-card .sp-c { margin-right: 5px; }
+.sp-grid .sp-card.busy { animation: sp-pulse 1.4s ease-in-out infinite; }
+.sp-grid .sp-card.busy .sp-card-n::before { content: "● "; color: var(--sp-glow); }
+@keyframes sp-pulse {
+  0%, 100% { box-shadow: 0 0 0 1.5px var(--sp-glow), 0 0 0 0 rgba(30, 155, 255, 0); }
+  50% { box-shadow: 0 0 0 2.5px var(--sp-glow), 0 0 14px 3px rgba(30, 155, 255, 0.35); }
+}
+@media (max-width: 860px) {
+  .sp-galwrap.grid { grid-template-columns: minmax(0, 1fr); }
+  .sp-galwrap.grid .sp-cap { position: static; order: -1; }
+}
+@media (prefers-reduced-motion: reduce) { .sp-grid .sp-card.busy { animation: none; box-shadow: 0 0 0 2px var(--sp-glow); } }
+
+/* A, round 5 (Chris): compact thumbnails, half the width of round 4's, each a fixed width for the whole
+   run (fixed tracks and cards that can't be widened by their counts). One sheet still fills the width. */
+.sp-grid, .sp-grid.n2, .sp-grid.n4 { grid-template-columns: repeat(auto-fit, minmax(208px, 1fr)); justify-content: center; }
+/* Round 6 (Chris): the thumbnails fill the space left of the check, centered, in equal columns. Track widths
+   come only from the panel's width (a fixed minimum, equal shares), never from what a card holds, so they
+   stay put through the run. */
+.sp-grid.n1 { grid-template-columns: minmax(0, 1fr); }
+.sp-grid .sp-card { width: 100%; min-width: 0; overflow: hidden; box-sizing: border-box; padding: 6px 6px 5px; border-radius: 10px; }
+.sp-grid:not(.n1) .sp-card-art { aspect-ratio: 1170 / 780; }
+.sp-grid:not(.n1) .sp-card-art .sp-svg { width: 100%; height: 100%; }
+.sp-grid .sp-card figcaption { font-size: 11.5px; margin-top: 4px; }
+.sp-grid .sp-card-c { flex: none; }
+.sp-grid .sp-card .sp-c { margin-right: 3px; }
+
+/* Round 6: flex rows of cards at --card-w (set by gallery.mount from the panel's width), centered. */
+.sp-grid:not(.n1) { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.sp-grid:not(.n1) .sp-card { flex: 0 0 var(--card-w, 208px); width: var(--card-w, 208px); }
+
+/* The finished bar: one even slot per check, slid along (or arrow keys) to replay one (Fabcheck's bar). */
+.sp-picks { display: none; }
+.sp-prog.steps .sp-bar { height: auto; margin: -8px 0; padding: 8px 0; background: none; cursor: ew-resize; touch-action: pan-y; user-select: none; -webkit-user-select: none; border-radius: 6px; outline: none; }
+.sp-prog.steps .sp-bar:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.sp-prog.steps .sp-fill, .sp-prog.steps .sp-run, .sp-prog.steps .sp-steps { display: none; }
+.sp-prog.steps .sp-picks { position: relative; display: flex; height: 15px; }
+.sp-prog.steps .sp-picks::before { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 5px; border-radius: 5px; background: var(--pass); opacity: 0.85; }
+.sp-picks span { position: relative; flex: 1 1 0; min-width: 0; }
+.sp-picks span::after { content: ""; position: absolute; left: 50%; top: 5px; height: 5px; width: 1px; margin-left: -0.5px; background: var(--bg-elev); opacity: 0.55; transition: top 0.12s var(--ease), height 0.12s var(--ease), width 0.12s var(--ease), margin 0.12s var(--ease); }
+.sp-picks span.m0::after { top: 3px; height: 9px; width: 2px; margin-left: -1px; opacity: 0.8; background: var(--text-3); }
+.sp-picks span.w::after { top: 1px; height: 13px; width: 4px; margin-left: -2px; opacity: 1; background: var(--warn-fill-hatch), var(--warn); border-radius: 1px; }
+.sp-picks span.e::after { top: -1px; height: 17px; width: 4px; margin-left: -2px; opacity: 1; background: var(--issue-fill-hatch), var(--issue); border-radius: 1px; }
+.sp-picks span.cur::after { top: -3px; height: 21px; width: 4px; margin-left: -2px; opacity: 1; background: var(--sp-glow); box-shadow: 0 0 6px var(--sp-glow); }
+.sp-bar:hover .sp-picks span:hover:not(.cur)::after { top: 0; height: 15px; opacity: 1; width: 3px; margin-left: -1.5px; }
+.sp-back { font: inherit; color: var(--accent-ink); background: none; border: 0; padding: 0; cursor: pointer; }
+.sp-back:hover { text-decoration: underline; }
+/* What a replayed check found. */
+.sp-found { margin-top: 10px; font-size: 12.5px; }
+.sp-found-h { font-weight: 600; color: var(--text-2); margin-bottom: 4px; }
+.sp-found ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.sp-found li { display: grid; grid-template-columns: 16px 1fr; gap: 4px; line-height: 1.35; color: var(--text); }
+.sp-found li b { font-weight: 400; font-size: 10px; padding-top: 2px; }
+.sp-found li.sev-error b { color: var(--issue); }
+.sp-found li.sev-warn b { color: var(--warn); }
+.sp-found li.sev-info b { color: var(--text-3); font-style: italic; font-family: Georgia, serif; font-size: 12px; padding-top: 0; }
+.sp-found li.more { display: block; color: var(--text-3); }
+@media (prefers-reduced-motion: reduce) { .sp-picks span::after { transition: none; } }

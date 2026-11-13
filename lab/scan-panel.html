@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- Design lab: the panel that shows what Pincheck is scanning while its checks run. Three directions,
+     one engine. Not loaded by the tool. The sheets drawn here are laid out by this page from the demo
+     netlist (made up), standing in for the sheet graphics the schematic viewer will read. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title>Pincheck lab · Scan panel</title>
+<link rel="stylesheet" href="../assets/suite.css">
+<link rel="stylesheet" href="scan-panel.css">
+</head>
+<body class="sp-body">
+<header class="sp-lab-head">
+  <div>
+    <div class="eyebrow">Pincheck lab · design step</div>
+    <h1 class="page-title">The scan panel</h1>
+    <p class="sp-lab-note">The demo's real checks, replayed. The sheets are <b>made up</b>: laid out by this page from the demo netlist until the viewer reads real sheet graphics.</p>
+  </div>
+  <div class="sp-lab-ctl">
+    <div class="seg" role="tablist" id="sp-dir">
+      <button data-dir="gallery">A · Sheet gallery</button>
+      <button data-dir="stack">B · Sheet stack</button>
+      <button data-dir="closeup">C · Part close-up</button>
+    </div>
+    <button class="btn" id="sp-replay">Run again</button>
+    <button class="btn" id="sp-theme" title="Light or dark">Theme</button>
+  </div>
+</header>
+<main class="sp-main"><section class="sp-panel card" id="sp-panel"></section><p id="sp-status" class="sp-sr" aria-live="polite"></p></main>
+<script src="../assets/cfb.js"></script>
+<script src="../assets/schdoc.js"></script>
+<script src="../assets/kicad.js"></script>
+<script src="../assets/protel.js"></script>
+<script src="../assets/design.js"></script>
+<script src="../assets/params.js"></script>
+<script src="../assets/library.js"></script>
+<script src="../assets/checks.js"></script>
+<script src="scan-panel.js"></script>
+</body>
+</html>

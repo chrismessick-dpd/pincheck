@@ -182,3 +182,130 @@ body.pk-dragging .pk-dropzone { display: grid; }
   .sv-rail { width: auto; max-height: 40%; border-left: none; border-top: 1px solid var(--hair); }
   .sv.rail-closed .sv-rail { width: auto; max-height: 44px; }
 }
+
+/* ── The scan panel (assets/scan.js): Fabcheck's inspection stage for schematics. Every sheet a thumbnail,
+   all running at once; the check under way on the right; the progress bar along the top, a slider of checks
+   once done. Severity never by hue alone: ✕ striped, ▲ dotted, i in a ring; a read pin is a small solid dot. */
+:root { --sp-glow: #1e9bff; --sp-paper: #ffffff; --sp-ink: #8a8f98; --sp-ink-2: #5f646c; --sp-ok: #00727f; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --sp-glow: #4cc2ff; --sp-paper: #121417; --sp-ink: #5c6470; --sp-ink-2: #9aa3ae; --sp-ok: #3fc1cf; } }
+:root[data-theme="dark"] { --sp-glow: #4cc2ff; --sp-paper: #121417; --sp-ink: #5c6470; --sp-ink-2: #9aa3ae; --sp-ok: #3fc1cf; }
+.sp-panel { padding: 18px 22px 18px; overflow: hidden; margin-bottom: 18px; }
+.sp-muted { color: var(--text-3); }
+.sp-ok { color: var(--pass); }
+.sp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; margin: 0; }
+/* The progress bar (Fabcheck's). */
+.sp-prog { margin: -18px -22px 14px; padding: 14px 22px 10px; border-bottom: 1px solid var(--hair); }
+.sp-bar { position: relative; height: 5px; border-radius: 5px; background: var(--bg-sunk); cursor: pointer; }
+.sp-fill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); background: linear-gradient(90deg, var(--accent), var(--sp-glow)); border-radius: inherit; }
+.sp-run { position: absolute; left: 0; top: 0; bottom: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.sp-run s { position: absolute; inset: 0; }
+.sp-run s::after { content: ""; position: absolute; top: 0; bottom: 0; width: 60px; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent); animation: sp-sweep 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+@keyframes sp-sweep { from { transform: translateX(-60px); } to { transform: translateX(1200px); } }
+.sp-steps { position: absolute; inset: 0; pointer-events: none; }
+.sp-steps span { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--bg-elev); opacity: 0.75; }
+.sp-steps span.m0 { top: -3px; bottom: -3px; width: 2px; background: var(--text-3); opacity: 0.5; }
+.sp-steps b { position: absolute; top: 0; bottom: 0; border-radius: 1px; opacity: 0.9; }
+.sp-steps b.w { background: var(--warn-fill-hatch), var(--warn); }
+.sp-steps b.e { background: var(--issue-fill-hatch), var(--issue); }
+.sp-picks { display: none; }
+.sp-prog.steps .sp-bar { height: auto; margin: -8px 0; padding: 8px 0; background: none; cursor: ew-resize; touch-action: pan-y; user-select: none; -webkit-user-select: none; border-radius: 6px; outline: none; }
+.sp-prog.steps .sp-bar:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
+.sp-prog.steps .sp-fill, .sp-prog.steps .sp-run, .sp-prog.steps .sp-steps { display: none; }
+.sp-prog.steps .sp-picks { position: relative; display: flex; height: 15px; }
+.sp-prog.steps .sp-picks::before { content: ""; position: absolute; left: 0; right: 0; top: 5px; height: 5px; border-radius: 5px; background: var(--pass); opacity: 0.85; }
+.sp-picks span { position: relative; flex: 1 1 0; min-width: 0; }
+.sp-picks span::after { content: ""; position: absolute; left: 50%; top: 5px; height: 5px; width: 1px; margin-left: -0.5px; background: var(--bg-elev); opacity: 0.55; transition: top 0.12s var(--ease), height 0.12s var(--ease), width 0.12s var(--ease), margin 0.12s var(--ease); }
+.sp-picks span.m0::after { top: 3px; height: 9px; width: 2px; margin-left: -1px; opacity: 0.8; background: var(--text-3); }
+.sp-picks span.w::after { top: 1px; height: 13px; width: 4px; margin-left: -2px; opacity: 1; background: var(--warn-fill-hatch), var(--warn); border-radius: 1px; }
+.sp-picks span.e::after { top: -1px; height: 17px; width: 4px; margin-left: -2px; opacity: 1; background: var(--issue-fill-hatch), var(--issue); border-radius: 1px; }
+.sp-picks span.cur::after { top: -3px; height: 21px; width: 4px; margin-left: -2px; opacity: 1; background: var(--sp-glow); box-shadow: 0 0 6px var(--sp-glow); }
+.sp-bar:hover .sp-picks span:hover:not(.cur)::after { top: 0; height: 15px; opacity: 1; width: 3px; margin-left: -1.5px; }
+.sp-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; font-size: 12px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.sp-c { margin-right: 10px; white-space: nowrap; }
+.sp-c b { font-weight: 400; font-size: 9px; vertical-align: 1px; margin-right: 3px; }
+.sp-c.e b { color: var(--issue); }
+.sp-c.w b { color: var(--warn); }
+.sp-c.i b { color: var(--text-3); font-style: italic; font-family: Georgia, serif; font-size: 11px; }
+.sp-back { font: inherit; color: var(--accent-ink); background: none; border: 0; padding: 0; cursor: pointer; }
+.sp-back:hover { text-decoration: underline; }
+/* The gallery and the words beside it. */
+.sp-galwrap { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 14px 20px; align-items: start; }
+.sp-cap { padding-top: 4px; position: sticky; top: 12px; }
+.sp-eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--accent-ink); font-variant-numeric: tabular-nums; }
+.sp-title { font: 600 19px/1.25 var(--display); margin: 4px 0 6px; }
+.sp-desc { font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.sp-now { color: var(--text); }
+.sp-found { margin-top: 10px; font-size: 12.5px; }
+.sp-found-h { font-weight: 600; color: var(--text-2); margin-bottom: 4px; }
+.sp-found ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.sp-found li { display: grid; grid-template-columns: 16px 1fr; gap: 4px; line-height: 1.35; }
+.sp-found li b { font-weight: 400; font-size: 10px; padding-top: 2px; }
+.sp-found li.sev-error b { color: var(--issue); }
+.sp-found li.sev-warn b { color: var(--warn); }
+.sp-found li.sev-info b { color: var(--text-3); font-style: italic; font-family: Georgia, serif; font-size: 12px; padding-top: 0; }
+.sp-found li.more { display: block; color: var(--text-3); }
+.sp-flink { font: inherit; color: var(--text); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.sp-flink:hover { color: var(--accent-ink); text-decoration: underline; }
+.sp-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.sp-grid.n1 { display: block; }
+.sp-card { margin: 0; flex: 0 0 var(--card-w, 208px); width: var(--card-w, 208px); min-width: 0; overflow: hidden; box-sizing: border-box; padding: 6px 6px 5px; border-radius: 10px; background: var(--bg-sunk); border: 1px solid var(--hair); }
+.sp-grid.n1 .sp-card { width: 100%; }
+.sp-card-art { aspect-ratio: 1170 / 780; }
+.sp-card-art .sp-svg { width: 100%; height: 100%; display: block; }
+.sp-card figcaption { display: flex; align-items: baseline; gap: 4px; margin-top: 4px; font-size: 11.5px; font-weight: 600; flex-wrap: nowrap; min-width: 0; }
+.sp-card-n { color: var(--text-3); font-weight: 500; white-space: nowrap; flex: none; }
+.sp-card-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sp-card-c { margin-left: auto; font-weight: 400; flex: none; }
+.sp-card .sp-c { margin-right: 3px; }
+.sp-card.busy { animation: sp-pulse 1.4s ease-in-out infinite; }
+.sp-card.busy .sp-card-n::before { content: "● "; color: var(--sp-glow); }
+@keyframes sp-pulse { 0%, 100% { box-shadow: 0 0 0 1.5px var(--sp-glow), 0 0 0 0 rgba(30, 155, 255, 0); } 50% { box-shadow: 0 0 0 2.5px var(--sp-glow), 0 0 14px 3px rgba(30, 155, 255, 0.35); } }
+@media (max-width: 860px) { .sp-galwrap { grid-template-columns: minmax(0, 1fr); } .sp-cap { position: static; order: -1; } }
+/* A sheet, drawn in its own units, its strokes a fixed width on screen. */
+.sp-svg { overflow: hidden; }
+.sp-svg path, .sp-svg rect.sp-paper { vector-effect: non-scaling-stroke; }
+.sp-paper { fill: var(--sp-paper); stroke: var(--hair-2); stroke-width: 1; }
+.sp-frame { fill: none; stroke: var(--sp-ink); stroke-width: 0.6; opacity: 0.6; }
+.sp-body { fill: none; stroke: var(--sp-ink-2); stroke-width: 0.8; }
+.sp-pin { fill: none; stroke: var(--sp-ink-2); stroke-width: 0.6; }
+.sp-wire { fill: none; stroke: var(--sp-ink); stroke-width: 0.7; }
+.sp-bus { fill: none; stroke: var(--sp-ink); stroke-width: 1.6; }
+.sp-svg path.sp-read { fill: var(--sp-ok); stroke: none; opacity: 0.85; }
+.sp-fx { pointer-events: none; }
+.sp-pop, .sp-pop .pp-core, .sp-pop .pp-ring { transform-box: fill-box; transform-origin: center; }
+.sp-pop .pp-core { fill: var(--sp-glow); animation: sp-pop 0.95s var(--ease) both; }
+.sp-pop .pp-ring { fill: none; stroke: var(--sp-glow); animation: sp-ring 0.95s ease-out both; }
+.sp-pop { animation: sp-life 0.95s linear both; }
+.sp-pop.frozen, .sp-pop.frozen * { animation-play-state: paused; }
+@keyframes sp-pop { 0% { transform: scale(0); opacity: 0; } 25% { transform: scale(1.35); opacity: 1; } 55% { transform: scale(1); opacity: 1; } 100% { transform: scale(0.7); opacity: 0; } }
+@keyframes sp-ring { 0% { transform: scale(0.3); opacity: 0.9; } 100% { transform: scale(1.4); opacity: 0; } }
+@keyframes sp-life { to { opacity: 1; } }
+/* Finding marks: a click shows the finding on the sheet. */
+.sp-mark { cursor: pointer; }
+.sp-svg .sp-mark path { vector-effect: none; }
+.sp-mark .mk-shape { stroke-width: 1.6; }
+.sp-mark.sev-error .mk-shape { stroke: var(--issue); }
+.sp-mark.sev-warn .mk-shape { stroke: var(--warn); stroke-linejoin: round; }
+.sp-mark.sev-info .mk-shape { fill: var(--bg-elev); stroke: var(--text-3); }
+.sp-mark .mk-glyph { fill: none; stroke-width: 2.2; stroke-linecap: round; }
+.sp-mark.sev-error .mk-glyph { stroke: var(--issue); }
+.sp-mark.sev-warn .mk-glyph { stroke: var(--text); }
+.sp-mark.sev-info .mk-glyph { stroke: var(--text-2); }
+.sp-mark:hover .mk-shape { stroke-width: 2.6; }
+.sp-hf-e { fill: var(--bg-elev); }
+.sp-hl-e { stroke: var(--issue); stroke-width: 1.4; opacity: 0.55; }
+.sp-hf-w { fill: var(--bg-elev); }
+.sp-hl-w { fill: var(--warn); opacity: 0.8; }
+.sp-mark.land { animation: sp-land 0.5s cubic-bezier(0.25, 1.4, 0.5, 1) both; transform-box: fill-box; transform-origin: center; }
+@keyframes sp-land { from { opacity: 0; scale: 1.8; } to { opacity: 1; scale: 1; } }
+/* The start page's empty panel: the drop target. */
+.sp-empty { cursor: pointer; border: 1.5px dashed var(--hair-2); box-shadow: none; transition: border-color 0.15s, background 0.15s; }
+.sp-empty:hover, .sp-empty:focus-visible, body.pk-dragging .sp-empty { border-color: var(--accent); background: var(--accent-soft); outline: none; }
+.sp-empty .sp-bar { cursor: inherit; }
+.sp-ghost { width: 100%; height: 100%; border-radius: 4px; border: 1.5px dashed var(--hair-2); background: var(--sp-paper); box-sizing: border-box; }
+.sp-empty .sp-card { flex-basis: 30%; width: 30%; }
+@media (prefers-reduced-motion: reduce) {
+  .sp-run s::after, .sp-mark.land { animation: none; }
+  .sp-card.busy { animation: none; box-shadow: 0 0 0 2px var(--sp-glow); }
+  .sp-picks span::after { transition: none; }
+}

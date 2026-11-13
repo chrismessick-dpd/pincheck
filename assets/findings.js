@@ -28,12 +28,16 @@
     const unv = live.filter(f => f.unverified).length;
     const sub = '<span>' + d.sheets.length + ' file' + (d.sheets.length === 1 ? '' : 's') + '</span><span class="sep">·</span><span>' + d.parts.length + ' parts</span><span class="sep">·</span><span>' + (d.nets ? d.nets.length + ' nets' : 'no netlist') + '</span><span class="sep">·</span><span>checked in ' + run.ms + ' ms</span>';
     let h = '<div class="page pk-wide">' + head(d, sub);
+    // The scan panel leads the page when the design has sheet drawings (assets/scan.js); while it plays, the
+    // totals wait for it, as Fabcheck's do for its stage.
+    if (ctx.scan) h += '<div id="pk-scan-host"></div>';
+    const busy = !!ctx.scanning;
     if (!run.hasNets) h += '<div class="hint"><b>Only the library checks ran</b>There are no nets: drop the project\'s Protel2 netlist (Altium: Design › Netlist For Project › Protel2) with the sheets, or a KiCad XML netlist.</div>';
     h += '<div class="grid grid-4 pk-stats">' +
-      statCard(cc.error, 'errors', 'error', 'error') + statCard(cc.warn, 'warnings', 'warn', 'warn') + statCard(cc.info, 'notes', 'info', 'info') +
+      statCard(cc.error, 'errors', 'error', 'error', busy) + statCard(cc.warn, 'warnings', 'warn', 'warn', busy) + statCard(cc.info, 'notes', 'info', 'info', busy) +
       '<button class="card stat pk-statbtn" data-tab="parts"><div class="stat-num">' + known + ' / ' + ics.length + '</div><div class="pk-muted">ICs and crystals with a part file</div></button></div>';
     if (unv) h += '<p class="pk-muted" style="margin-top:10px">' + plural(unv, 'finding rests', 'findings rest') + ' on part-file values nobody has verified, so ' + (unv === 1 ? 'it is' : 'they are') + ' warnings at most. Verify the values (each finding names them) to make them count.</p>';
-    const top = live.filter(f => f.severity !== 'info').slice(0, 8);
+    const top = busy ? [] : live.filter(f => f.severity !== 'info').slice(0, 8);
     if (waived) h += '<p class="pk-muted" style="margin-top:10px">' + plural(waived, 'finding is', 'findings are') + ' waived: <button class="pk-link" data-tab="findings">see them under Waived</button>.</p>';
     if (top.length) {
       h += '<div class="section-title pk-sect">Most serious <span class="pk-muted">' + (live.length > top.length ? top.length + ' of ' + live.length + ' · <button class="pk-link" data-tab="findings">All findings</button>' : '') + '</span></div><div class="card pk-flist">';
@@ -47,7 +51,9 @@
       : '<p class="pk-muted">No rail voltages could be worked out: no regulator in the library sets one, and no net name states one.</p>';
     return h + '</div>';
   }
-  const statCard = (n, label, sev, filter) => '<button class="card stat pk-statbtn pk-stat-' + sev + (n ? ' has' : '') + '" data-sevonly="' + filter + '"><div class="stat-num">' + (n ? '<span aria-hidden="true">' + SEV[sev][0] + '</span> ' : '') + n + '</div><div class="pk-muted">' + label + '</div></button>';
+  const statCard = (n, label, sev, filter, busy) => busy
+    ? '<div class="card stat pk-statbtn pk-stat-' + sev + '"><div class="stat-num">–</div><div class="pk-muted">' + label + '</div></div>'
+    : '<button class="card stat pk-statbtn pk-stat-' + sev + (n ? ' has' : '') + '" data-sevonly="' + filter + '"><div class="stat-num">' + (n ? '<span aria-hidden="true">' + SEV[sev][0] + '</span> ' : '') + n + '</div><div class="pk-muted">' + label + '</div></button>';
 
   // ── Findings ──
   function findings(d, run, ctx) {
