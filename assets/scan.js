@@ -6,7 +6,7 @@
 // of checks once the run is done, to replay one. Designed in lab/scan-panel.html (Chris, 2026-11-13).
 //
 // The checks themselves finish in milliseconds (assets/checks.js), so this is a paced replay of the finished
-// run, about 8 seconds whatever the design's size (Chris). It shows only for designs with sheet drawings
+// run, 2.5 seconds whatever the design's size (Chris). It shows only for designs with sheet drawings
 // (PK.design's `drawings`); a netlist alone gets no panel, as Fabcheck shows no stage without a board.
 //
 // PK.scan.attach(host, design, run, opts) puts the design's panel in `host`, keeping the same panel (and its
@@ -21,7 +21,7 @@
   const plural = (n, a, b) => n + ' ' + (n === 1 ? a : b || a + 's');
   const SEVCH = { error: '✕', warn: '▲', info: 'i' };
   const DIR = [[1, 0], [0, 1], [-1, 0], [0, -1]];
-  const TOTAL = 8000;        // a replay's length, ms (Chris, 2026-11-13: about 8 s)
+  const TOTAL = 2500;        // a replay's length, ms (Chris, 2026-11-13: 8 s, then a snappy 2.5 s)
   const MAX_BEATS = 8;       // at most this many beats per sheet per check; more parts share a beat
   const HOLD = 900;          // a replayed check holds at its end this long before playing again
   const REPLAY_SLOW = 2.5;   // a replayed check plays this much slower than in the run, so its words can be read (Chris)

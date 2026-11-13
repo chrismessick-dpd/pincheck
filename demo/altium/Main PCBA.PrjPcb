@@ -1,0 +1,16 @@
+[Design]
+Version=1.0
+CurrentVariant=Development
+
+[ProjectVariant1]
+Description=Development
+AllowFabrication=0
+VariationCount=0
+ParamVariationCount=0
+
+[ProjectVariant2]
+Description=Production
+AllowFabrication=1
+VariationCount=1
+Variation1=Designator=J5|UniqueId=\DEMOJ5|Kind=1|AlternatePart=
+ParamVariationCount=0

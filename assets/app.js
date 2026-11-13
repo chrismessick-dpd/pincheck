@@ -137,7 +137,8 @@
   function ensureRun(d) {
     // A run reopened from Signoff EE keeps its findings as sent until "Run checks again".
     if (d.fromRun && d.run) return d.run;
-    const gen = state.libGen + ':' + (PK.mates ? PK.mates.cache.gen : 0);
+    // The connector assignments are kept by design name, so a rename (the demo's, after opening) checks again.
+    const gen = state.libGen + ':' + (PK.mates ? PK.mates.cache.gen : 0) + ':' + d.name;
     if (d.run && d.runGen === gen) return d.run;
     try { d.run = PK.checks.run(d, state.lib, PK.mates ? PK.mates.forDesign(d) : null); } catch (e) { console.error(e); toast('The checks stopped: ' + e.message, 'error'); d.run = { findings: [], rails: [], coverage: {}, parts: {}, ms: 0, hasNets: false }; }
     d.runGen = gen;
@@ -845,6 +846,17 @@
   document.addEventListener('change', e => {
     const id = e.target.dataset.id, d = active();
     if (id === 'fgroup') { state.check = e.target.value; renderView(); return; }
+    // The build variant: mark its parts not fitted and check again (a stored run too, which then leaves its sent findings).
+    if (id === 'variant' && d) {
+      d.variant = e.target.value;
+      D.applyVariant(d.parts, d.variants || [], d.variant);
+      d.notes = (d.notes || []).filter(n => !/not fitted .*left out of the checks\.$/.test(n));
+      const off = d.parts.filter(p => p.dnp);
+      if (off.length) d.notes.push((d.variant ? 'Variant ' + d.variant + ': ' : '') + plural(off.length, 'part') + ' not fitted (' + off.slice(0, 6).map(p => p.ref).join(', ') + (off.length > 6 ? ', …' : '') + '), left out of the checks.');
+      d.fromRun = null; d.run = null; d.soResult = null; ensureRun(d);
+      toast((d.variant ? 'Variant ' + d.variant : 'No variant') + ': ' + d.run.findings.filter(f => !f.waived && f.severity !== 'info').length + ' issues');
+      renderAll(); return;
+    }
     if (!d || !/^so-/.test(id || '')) return;
     // Send's board and its boxes (all errors and warnings, one kind, or one issue).
     if (id === 'so-project') { d.soSlug = e.target.value; d.soResult = null; d.soBlocked = null; renderView(); return; }

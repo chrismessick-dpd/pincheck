@@ -28,6 +28,20 @@
       (s.projectId ? ' <button class="pk-link" data-act="so-back" data-project="' + esc(s.projectId) + '">Back to Signoff EE</button>' : '') + '</div>';
   }
 
+  // The build variant being checked (Chris, 2026-11-13): Altium's variants from the .PrjPcb, a picker when there are
+  // any, and how many parts it leaves unfitted. Changing it reruns the checks (app.js, data-id="variant").
+  function variantBar(d) {
+    const vs = d.variants || [];
+    const off = d.parts.filter(p => p.dnp);
+    const own = off.filter(p => !vs.some(v => v.name === d.variant && v.notFitted.some(r => r.toUpperCase() === String(p.ref).toUpperCase())));
+    const count = off.length ? plural(off.length, 'part') + ' not fitted' + (own.length && own.length < off.length ? ' (' + own.length + ' by their own DNP)' : own.length ? ' (by their own DNP)' : '') : 'every part fitted';
+    const pick = vs.length
+      ? '<select class="input pk-variant-sel" data-id="variant" aria-label="Build variant">' + vs.map(v => '<option value="' + esc(v.name) + '"' + (v.name === d.variant ? ' selected' : '') + '>' + esc(v.name) + ' (' + v.notFitted.length + ' not fitted)</option>').join('') + '<option value=""' + (!d.variant ? ' selected' : '') + '>No variant: every part fitted</option></select>'
+      : '<b class="pk-variant-name">' + (d.source === 'altium' ? 'None in the project' : 'No variants') + '</b>';
+    const hint = vs.length ? '' : d.source === 'altium' ? '<span class="pk-muted">Drop the project\'s folder or .zip (with its .PrjPcb) to check its variants.</span>' : '';
+    return '<div class="pk-variant"><span class="pk-variant-label">Build variant</span>' + pick + '<span class="pk-variant-count' + (off.length ? '' : ' pk-muted') + '"' + (off.length ? ' title="' + esc(off.map(p => p.ref).join(', ')) + '"' : '') + '>' + count + (off.length ? ', left out of the checks' : '') + '</span>' + hint + '</div>';
+  }
+
   // ── Overview ──
   function overview(d, run, ctx) {
     const live = run.findings.filter(f => !f.waived), waived = run.findings.length - live.length;
@@ -36,7 +50,7 @@
     const known = ics.filter(g => PK.library.find(ctx.lib, g.mpn)).length;
     const unv = live.filter(f => f.unverified).length;
     const sub = '<span>' + d.sheets.length + ' file' + (d.sheets.length === 1 ? '' : 's') + '</span><span class="sep">·</span><span>' + d.parts.length + ' parts</span><span class="sep">·</span><span>' + (d.nets ? d.nets.length + ' nets' : 'no netlist') + '</span><span class="sep">·</span><span>checked in ' + run.ms + ' ms</span>';
-    let h = '<div class="page pk-wide">' + head(d, sub);
+    let h = '<div class="page pk-wide">' + head(d, sub) + variantBar(d);
     // The scan panel leads the page when the design has sheet drawings (assets/scan.js); while it plays, the
     // totals wait for it, as Fabcheck's do for its stage.
     if (ctx.scan) h += '<div id="pk-scan-host"></div>';
@@ -75,7 +89,7 @@
     const shown = base.filter(f => sevOn[f.severity] && (!q || (f.title + ' ' + f.detail + ' ' + f.refs.join(' ') + ' ' + f.nets.join(' ')).toLowerCase().includes(q)));
     const cc = counts(base);
     const sub = '<span>' + plural(cc.error, 'error') + '</span><span class="sep">·</span><span>' + plural(cc.warn, 'warning') + '</span><span class="sep">·</span><span>' + plural(cc.info, 'note') + '</span>';
-    let h = '<div class="page pk-wide">' + head(d, sub);
+    let h = '<div class="page pk-wide">' + head(d, sub) + variantBar(d);
     h += '<div class="pk-ftools"><input class="input pk-fq" data-id="fq" placeholder="Filter findings (part, net, or words)" value="' + esc(st.q || '') + '">' +
       '<div class="seg sev-seg">' + ['error', 'warn', 'info'].map(s => '<button data-sev="' + s + '" class="' + (sevOn[s] ? 'on' : '') + '"><span class="pk-sevdot pk-sev-' + s + '" aria-hidden="true">' + SEV[s][0] + '</span>' + SEV[s][2] + ' <span class="count">' + cc[s] + '</span></button>').join('') + '</div>' +
       '<select class="input pk-fgroup" data-id="fgroup"><option value="">Every check</option>' + groups().map(g => '<optgroup label="' + esc(g) + '"><option value="group:' + esc(g) + '"' + (st.check === 'group:' + g ? ' selected' : '') + '>All ' + esc(g.toLowerCase()) + '</option>' + C.CATALOG.filter(c => c.group === g).map(c => '<option value="' + c.key + '"' + (st.check === c.key ? ' selected' : '') + '>' + esc(c.title) + '</option>').join('') + '</optgroup>').join('') + '</select></div>';

@@ -190,8 +190,8 @@ section of `assets/styles.css` build it.
 - **Only with sheets:** a netlist alone (KiCad, or Protel2 without the .SchDoc files) gets no panel, as
   Fabcheck shows no stage without a board (Chris).
 - **The start page:** an empty panel is the drop target. Click it, press Enter, or drop files anywhere.
-- **A replay, about 8 s (Chris):** the checks finish in milliseconds, so the panel plays the finished run.
-  Each check gets a share of the 8 s by how much it reads, and a busy sheet groups its parts so it has at
+- **A replay, 2.5 s (Chris; 8 s at first):** the checks finish in milliseconds, so the panel plays the finished run.
+  Each check gets a share of the 2.5 s by how much it reads, and a busy sheet groups its parts so it has at
   most 8 beats per check.
 - **Guessed, not traced:** what each check reads is worked out in `scan.js` (`plan`, `TARGETS`) from pin
   roles, part kinds, net names, and `run.coverage`. Only the findings' places are exact (their `pins`,

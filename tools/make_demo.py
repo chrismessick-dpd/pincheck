@@ -227,7 +227,14 @@ def main():
         names.append(name)
     (OUT / 'library' / 'index.json').write_text(json.dumps(names, indent=2) + '\n', encoding='utf-8', newline='\n')
     sheets = make_demo_altium.make(PARTS, NETS, OUT / 'altium', pin_num)
-    (OUT / 'altium' / 'index.json').write_text(json.dumps(sheets + ['Main PCBA.NET'], indent=2) + '\n', encoding='utf-8', newline='\n')
+    # The project file, for its build variants (Altium's [ProjectVariantN]; Kind=1 is Not Fitted): Development fits
+    # everything, Production leaves the debug header off.
+    prj = ['[Design]', 'Version=1.0', 'CurrentVariant=Development', '',
+           '[ProjectVariant1]', 'Description=Development', 'AllowFabrication=0', 'VariationCount=0', 'ParamVariationCount=0', '',
+           '[ProjectVariant2]', 'Description=Production', 'AllowFabrication=1', 'VariationCount=1',
+           'Variation1=Designator=J5|UniqueId=\\DEMOJ5|Kind=1|AlternatePart=', 'ParamVariationCount=0', '']
+    (OUT / 'altium' / 'Main PCBA.PrjPcb').write_text('\r\n'.join(prj), encoding='utf-8', newline='')
+    (OUT / 'altium' / 'index.json').write_text(json.dumps(sheets + ['Main PCBA.NET', 'Main PCBA.PrjPcb'], indent=2) + '\n', encoding='utf-8', newline='\n')
     print('wrote', OUT / 'thermostat-main-pcba.xml', 'and', len(names), 'library files, and', len(sheets), 'Altium sheets with their netlist')
 
 

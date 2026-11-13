@@ -37,7 +37,7 @@ the suite's hard rules.
   `tools/make_demo_altium.py` (with `tools/schdoc_write.py`), beside the KiCad netlist.
 - **Scan panel (2026-11-13, Chris: Fabcheck's stage for schematics, the gallery chosen from three in
   `lab/scan-panel.html`; pushed `bb090a4`):** `assets/scan.js` leads a design's Overview when it has sheet
-  drawings. Every sheet is a thumbnail, all running at once during an 8 s replay of the run. Findings land
+  drawings. Every sheet is a thumbnail, all running at once during a 2.5 s replay of the run (8 s until Chris made it snappier, 2026-11-13). Findings land
   as marks, and the finished bar is a slider to replay one check. The start page's empty panel is the drop
   target. See `docs/design.md`, *The scan panel*.
 - **Finding detail panel (2026-11-13, Chris: rows stay collapsed; a panel on the right like Fabcheck's, with a
@@ -73,7 +73,8 @@ the suite's hard rules.
 - **Logic levels between parts (2026-11-13, Chris: a 5 V transceiver logic side on 3.3 V MCUs, found by a blind run;
   not committed):** series resistors up to 1 kΩ join a signal (`seriesLinks`, `logicNode`), `io.vih` and the new `io.vil`
   use each side's own supply, `io.unpowered` traces rails to their sources (`railRoot`, `independent`), and parts not
-  fitted (Altium variants, DNP) leave the checks. New catalog key `io.absmax.off`. See `docs/checks.md`, *Logic levels
+  fitted (Altium variants, DNP) leave the checks, with a *Build variant* picker on Overview and Findings. New catalog key
+  `io.absmax.off`. Pushed `d045099`; the variant picker and the 2.5 s scan are not committed. See `docs/checks.md`, *Logic levels
   between parts*.
 
 ## Rules
