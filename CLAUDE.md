@@ -85,7 +85,7 @@ the suite's hard rules.
   `../.claude/skills/`. Pincheck's Findings shows a design's latest scan above the offline findings (`assets/claude.js`),
   each item with Confirm, Not a problem, a reply, and Accept all, saved as the scan's `decisions.json`; the head's
   *Check with Claude…* writes the prompt. The demo has a made-up scan (`demo/claude-scan.json`). Ledger:
-  `docs/learned.md`. Then (2026-11-13, Chris: the skills downloaded from Pincheck, not a private repo; not committed):
+  `docs/learned.md`. Then (2026-11-13, Chris: the skills downloaded from Pincheck, not a private repo; pushed `0cd668a`):
   *Download the skills* in Check with Claude and Batch configure zips `skill/` as `.claude/skills/<name>/SKILL.md`
   (`PK.claude.downloadSkills`, a stored zip written in the page). A netlist part now keeps the SchDoc sheets it's drawn on (`design.js`).
 
