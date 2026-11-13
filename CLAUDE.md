@@ -78,7 +78,7 @@ the suite's hard rules.
    change to `model.js` or `github.js`.
 2. `python tools/stamp_version.py`.
 3. Serve the tools folder (preview `signoff-suite-alt`, port 8774) and open `pincheck/tests/test.html`:
-   PASS (39 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
+   PASS (40 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
    three sheets.
 4. In the browser pane, scripts are cached: fetch changed files with `{cache: 'reload'}` first. The demo
    library is loaded into IndexedDB `pincheck-demo` once; delete that database to reload it.

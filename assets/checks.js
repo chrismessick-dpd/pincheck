@@ -51,6 +51,8 @@
     let m = /(?:^|[_+\-\s])\+?P?(\d{1,2})V(\d{1,2})(?=$|[_\-\s])/.exec(n);
     if (m) { v = +(m[1] + '.' + m[2]); rest = n.replace(m[0], '_'); }
     else if ((m = /(?:^|[_+\-\s])\+?(\d{1,3}(?:\.\d{1,2})?)V(?:DC)?(?=$|[_\-\s])/.exec(n))) { v = +m[1]; rest = n.replace(m[0], '_'); }
+    // V1.8MCU, V3.3IO, +V1.8_INT: a V, a voltage with a decimal point, then the rail's name.
+    else if ((m = /^\+?V(\d{1,2}\.\d{1,2})[_\-]?([A-Z][A-Z0-9]*)?$/.exec(n))) return +m[1];
     if (v == null) return null;
     const words = rest.split(/[_\-+\s]+/);
     return words.every(w => RAIL_WORDS.has(w) || /^\d+$/.test(w)) ? v : null;
@@ -141,6 +143,19 @@
       if (f) files.set(p.ref, f);
       why[p.ref] = f ? f.id : null;
     }
+    // An exposed pad the part file numbers PAD (or EP) may be numbered 11 or 7 on the symbol: give the file's
+    // number the net of the symbol's pad pin (named EP, EXP, PAD, or the like, and not a number the file uses).
+    const PAD_NAME = /^(E?PAD|EP|EXP|THERMAL|THERMAL[\s_]?PAD|TAB|POWERPAD|GND[\s_]?PAD|SLUG)$/i;
+    for (const [ref, f] of files) {
+      const p = parts.get(ref);
+      const nums = new Set(f.pins.map(x => String(x.num).toUpperCase()));
+      for (const fp of f.pins) {
+        if (fp.role !== 'pad' || netOf.has(ref + '.' + fp.num) || p.pins.some(x => String(x.num).toUpperCase() === String(fp.num).toUpperCase())) continue;
+        const sp = p.pins.find(x => PAD_NAME.test(String(x.name || '').trim()) && !nums.has(String(x.num).toUpperCase()));
+        const n = sp && netOf.get(ref + '.' + sp.num);
+        if (n) netOf.set(ref + '.' + fp.num, n);
+      }
+    }
     const filePin = (ref, num) => { const f = files.get(ref); return f ? f.pins.find(x => String(x.num).toUpperCase() === String(num).toUpperCase()) : null; };
     const valueOf = (f, k, on) => (f.values || []).find(v => v.k === k && (v.on || '') === (on || '')) || (on ? null : null);
     return { design, lib, parts, nets, netOf, files, why, filePin, valueOf };
@@ -183,8 +198,14 @@
       const vref = M.valueOf(f, 'reg.vref');
       const fb = f.pins.find(x => x.role === 'feedback');
       const vtyp = v => (v.typ != null ? v.typ : v.value != null ? v.value : v.min != null && v.max != null ? (v.min + v.max) / 2 : v.max != null ? v.max : v.min);
+      // A fixed-output part with no output pin senses its output on FB (TPS62231: FB to VOUT). Only when FB isn't
+      // a divider's midpoint (no resistor from it to ground).
+      const fbIsOut = !outPins.length && fb && (() => {
+        const fbNet = M.netOf.get(ref + '.' + fb.num);
+        return fbNet && !(M.nets.get(fbNet) || []).some(n => { const r = M.parts.get(n.ref); const e = r && r.kind === 'resistor' && twoPin(M, r); return e && e.some(x => x !== fbNet && ground.has(x)); });
+      })();
       if (vout && typeof vtyp(vout) === 'number') {
-        for (const op of outPins) setReg(M.netOf.get(ref + '.' + op.num), vtyp(vout), ref + ' output (' + f.mpn + ')', { basis: [basisOf(f, vout)], unverified: !vout.ok });
+        for (const op of (fbIsOut ? [fb] : outPins)) setReg(M.netOf.get(ref + '.' + op.num), vtyp(vout), ref + ' output (' + f.mpn + ')', { basis: [basisOf(f, vout)], unverified: !vout.ok });
       } else if (vref && fb && typeof vtyp(vref) === 'number') {
         const fbNet = M.netOf.get(ref + '.' + fb.num);
         if (!fbNet) continue;
@@ -351,8 +372,10 @@
           // The part's own supply output counts once reached through a series part (an isolated converter's output through a
           // bead to its own isolated input), but never its core-regulator capacitor pins (VCAP, VDD11, VDDCORE).
           const CORE = /^(VCAP|VDD11|V11|VDDCORE|VCORE|VDDLDO|VDD_?CORE)/i;
-          const sourceOn = (n, depth) => { const fp = M.filePin(n.ref, n.pin); const q = M.parts.get(n.ref); if (!q) return false; if (n.ref === ref && (depth === 0 || !fp || CORE.test(fp.name))) return false; return (fp && fp.role === 'power-out' && !(n.ref === ref && CORE.test(fp.name))) || (n.ref !== ref && (q.kind === 'connector' || /^(D|PS|BT)\d/i.test(q.ref) || (!M.files.get(q.ref) && (q.kind === 'ic' || q.kind === 'other')))); };
-          const passOn = (q, from) => { if (!q || q.pins.length !== 2) return null; const lowR = q.kind === 'resistor' && ((passiveValue(q, 'Ω') || {}).v ?? 99) <= 1; if (!(q.kind === 'inductor' || lowR || /^(FB|F)\d/i.test(q.ref))) return null; const e = twoPin(M, q); return e && (e[0] === from ? e[1] : e[0]); };
+          const sourceOn = (n, depth) => { const fp = M.filePin(n.ref, n.pin); const q = M.parts.get(n.ref); if (!q) return false; if (n.ref === ref && (depth === 0 || !fp || CORE.test(fp.name))) return false; const qf = M.files.get(q.ref); return (fp && fp.role === 'power-out' && !(n.ref === ref && CORE.test(fp.name))) || (n.ref !== ref && (q.kind === 'connector' || (qf && qf.kind === 'connector') || /^(D|PS|BT)\d/i.test(q.ref) || (!M.files.get(q.ref) && (q.kind === 'ic' || q.kind === 'other')))); };
+          // A series resistor up to 1 kΩ feeds a supply pin too (a 10 Ω filter on a gauge's BATT, the 1 kΩ to a
+          // MAX17335's PCKP): the pin is supplied, though its voltage isn't carried through.
+          const passOn = (q, from) => { if (!q || q.pins.length !== 2) return null; const rv = q.kind === 'resistor' ? passiveValue(q, 'Ω') : null; const lowR = !!rv && !rv.dnp && rv.v != null && rv.v <= 1000; if (!(q.kind === 'inductor' || lowR || /^(FB|F)\d/i.test(q.ref))) return null; const e = twoPin(M, q); return e && (e[0] === from ? e[1] : e[0]); };
           let driven = false;
           for (let frontier = net ? [net] : [], seenN = new Set(frontier), d = 0; frontier.length && d < 4 && !driven; d++) {
             const next = [];
@@ -365,7 +388,7 @@
           }
           const backup = /^(VBAT|VBACKUP|VBKP|VBAK|VRTC)/i.test(pin.domain || pin.name);
           if (alone) add('supply.unpowered', 'error', label + ' is not connected' + (backup ? ' (backup supply)' : ''), backup ? 'A backup supply pin left open. Many parts need it tied to the main supply when no battery is fitted; check the datasheet\'s power section.' : 'A supply pin on no net, or alone on its net.', where);
-          else if (!nv && !driven) add('supply.unpowered', 'error', label + ' is not on a supply rail', 'Its net ' + net + ' has no known voltage and nothing that supplies one: no regulator output, connector, or rail reached through an inductor or ferrite bead. On it: ' + nodes.filter(n => n.ref !== ref).map(n => n.ref + ' ' + ((M.filePin(n.ref, n.pin) || (M.parts.get(n.ref) || { pins: [] }).pins.find(x => x.num === n.pin) || {}).name || n.pin)).slice(0, 8).join(', ') + '. Check it isn\'t swapped with a neighboring pin.', where);
+          else if (!nv && !driven) add('supply.unpowered', 'error', label + ' is not on a supply rail', 'Its net ' + net + ' has no known voltage and nothing that supplies one: no regulator output, connector, or rail reached through an inductor, ferrite bead, or series resistor up to 1 kΩ. On it: ' + nodes.filter(n => n.ref !== ref).map(n => n.ref + ' ' + ((M.filePin(n.ref, n.pin) || (M.parts.get(n.ref) || { pins: [] }).pins.find(x => x.num === n.pin) || {}).name || n.pin)).slice(0, 8).join(', ') + '. Check it isn\'t swapped with a neighboring pin.', where);
           if (nv && pin.domain) {
             const range = val('supply.range', pin.domain), absmax = val('supply.absmax', pin.domain), absmin = val('supply.absmin', pin.domain);
             const lim = v => evalExpr(v, doms);
@@ -375,7 +398,16 @@
               if (nv.v > am) add('supply.absmax', 'error', label + ' at ' + fmtV(nv.v) + ' is above its ' + fmtV(am) + ' absolute maximum', pin.domain + ' on net ' + net + ' (' + nv.from + '). The absolute maximum is ' + fmtV(am) + '.', Object.assign({ basis: [basisOf(f, absmax)].concat(nv.basis || []) }, where));
             } else skip('supply.absmax');
             if (absmin) { const am = lim(absmin.value != null ? absmin.value : absmin.min); if (am != null && nv.v < am) add('supply.absmax', 'error', label + ' at ' + fmtV(nv.v) + ' is below its ' + fmtV(am) + ' absolute minimum', 'Net ' + net + ' (' + nv.from + ').', Object.assign({ basis: [basisOf(f, absmin)] }, where)); }
-            if (range && (range.min != null || range.max != null)) {
+            // A range for when a feature is used ("USB used") applies only when the feature is wired: a pin offering it
+            // sits on a net named for it, or meets another part's pin named for it (PA11 as SPI1_MISO isn't USB).
+            const feat = range && /\b([A-Z][A-Z0-9]{1,8})\s+(?:is\s+)?used\b/.exec(range.cond || '');
+            const featUnused = feat && !f.pins.some(x => (x.functions || []).some(fn => fn.toUpperCase().includes(feat[1])) && (() => {
+              const nn = M.netOf.get(ref + '.' + x.num); if (!nn) return false;
+              if (nn.toUpperCase().includes(feat[1])) return true;
+              return (M.nets.get(nn) || []).some(o => o.ref !== ref && String((M.filePin(o.ref, o.pin) || {}).name || '').toUpperCase().includes(feat[1]));
+            })());
+            if (featUnused) skip('supply.range');
+            else if (range && (range.min != null || range.max != null)) {
               tick('supply.range');
               const lo = lim(range.min), hi = lim(range.max);
               if ((lo != null && nv.v < lo - 1e-6) || (hi != null && nv.v > hi + 1e-6)) add('supply.range', 'error', label + ' at ' + fmtV(nv.v) + ' is outside ' + (lo != null ? fmtV(lo) : '…') + ' to ' + (hi != null ? fmtV(hi) : '…'), pin.domain + '\'s recommended range' + (range.cond ? ' (' + range.cond + ')' : '') + '; net ' + net + ' is ' + fmtV(nv.v) + ' (' + nv.from + ').' + (range.note ? ' Note: ' + range.note : ''), Object.assign({ basis: [basisOf(f, range)].concat(nv.basis || []) }, where));
@@ -448,7 +480,9 @@
       const tied = val('supply.tied');
       if (tied && tied.list) {
         for (const line of tied.list) {
-          const ds = (line.match(/[A-Z][A-Z0-9_+]+/g) || []).filter(d => doms[d] != null);
+          // "VDDUSB to VDD (or VSS) when USB is unused": an alternative after "or" is a choice, not a third rail.
+          const main = line.replace(/\(\s*or\b[^)]*\)/gi, ' ').replace(/\bor\b.*$/i, ' ');
+          const ds = (main.match(/[A-Z][A-Z0-9_+]+/g) || []).filter((d, i, a) => doms[d] != null && a.indexOf(d) === i);
           if (ds.length < 2) continue;
           tick('supply.tied');
           const vs = ds.map(d => doms[d]);
@@ -457,18 +491,37 @@
       }
 
       // Decoupling per domain, and capacitors pins require.
-      const capsOn = net => (M.nets.get(net) || []).map(n => M.parts.get(n.ref)).filter(q => q && q.kind === 'capacitor').filter(q => { const e = twoPin(M, q); return e && (NV.ground.has(e[0]) || NV.ground.has(e[1])); }).map(q => ({ ref: q.ref, v: (passiveValue(q, 'F') || {}).v }));
+      // Capacitors to ground on a net, and on nets joined to it by 0 Ω links (a 1 Ω or smaller resistor is the
+      // same node: C1 at a regulator's output still decouples the rail past R3 0 Ω).
+      const capsOn = net => {
+        const group = [net], via = { [net]: null };
+        for (let i = 0; i < group.length && group.length < 12; i++) for (const n of M.nets.get(group[i]) || []) {
+          const q = M.parts.get(n.ref); if (!q || q.kind !== 'resistor') continue;
+          const rv = passiveValue(q, 'Ω'); if (!rv || rv.dnp || rv.v == null || rv.v > 1) continue;
+          const e = twoPin(M, q); if (!e) continue;
+          const o = e[0] === group[i] ? e[1] : e[0];
+          if (o && !(o in via) && !NV.ground.has(o)) { via[o] = q.ref; group.push(o); }
+        }
+        const out = [];
+        for (const g of group) for (const n of M.nets.get(g) || []) {
+          const q = M.parts.get(n.ref);
+          if (!q || q.kind !== 'capacitor' || out.some(c => c.ref === q.ref)) continue;
+          const e = twoPin(M, q); if (!e || !(NV.ground.has(e[0]) || NV.ground.has(e[1]))) continue;
+          out.push({ ref: q.ref + (via[g] ? ' (past ' + via[g] + ')' : ''), id: q.ref, v: (passiveValue(q, 'F') || {}).v });
+        }
+        return out;
+      };
       for (const dom of f.domains || []) {
         const dc = val('dec.c', dom), bulk = val('dec.bulk', dom);
         const pins = f.pins.filter(x => x.role === 'power-in' && x.domain === dom);
         const netsD = [...new Set(pins.map(x => M.netOf.get(ref + '.' + x.num)).filter(Boolean))];
         if (!netsD.length || (!dc && !bulk)) { if (pins.length) skip('parts.decoupling'); continue; }
         tick('parts.decoupling');
-        const caps = [].concat(...netsD.map(capsOn)).filter((c, i, a) => a.findIndex(x => x.ref === c.ref) === i);
+        const caps = [].concat(...netsD.map(capsOn)).filter((c, i, a) => a.findIndex(x => x.id === c.id) === i);
         const need = dc && (dc.value != null ? dc.value : dc.min);
         if (need) {
           const near = caps.filter(c => c.v != null && c.v >= need * 0.5);
-          if (near.length < pins.length) add('parts.decoupling', 'warn', ref + ' ' + dom + ': ' + near.length + ' decoupling capacitor' + (near.length === 1 ? '' : 's') + ' for ' + pins.length + ' supply pin' + (pins.length === 1 ? '' : 's'), 'The part file asks for ' + P.fmt(need, 'F') + ' at each ' + dom + ' pin. On ' + netsD.join(', ') + ': ' + (caps.length ? caps.map(c => c.ref + ' ' + (c.v != null ? P.fmt(c.v, 'F') : '?')).join(', ') : 'none') + '. Capacitors anywhere on the net count, so check they sit at the pins.', { refs: [ref].concat(caps.map(c => c.ref)).slice(0, 30), nets: netsD, basis: [basisOf(f, dc)] });
+          if (near.length < pins.length) add('parts.decoupling', 'warn', ref + ' ' + dom + ': ' + near.length + ' decoupling capacitor' + (near.length === 1 ? '' : 's') + ' for ' + pins.length + ' supply pin' + (pins.length === 1 ? '' : 's'), 'The part file asks for ' + P.fmt(need, 'F') + ' at each ' + dom + ' pin. On ' + netsD.join(', ') + ': ' + (caps.length ? caps.map(c => c.ref + ' ' + (c.v != null ? P.fmt(c.v, 'F') : '?')).join(', ') : 'none') + '. Capacitors anywhere on the net, or past a 0 Ω link, count, so check they sit at the pins.', { refs: [ref].concat(caps.map(c => c.id)).slice(0, 30), nets: netsD, basis: [basisOf(f, dc)] });
         }
         const b = bulk && (bulk.value != null ? bulk.value : bulk.min);
         if (b) {
@@ -480,22 +533,44 @@
         if (!pin.ext) continue;
         const ext = pin.ext.replace(/(\d)([pnuµ])(\d)/g, '$1.$3$2');
         const net = M.netOf.get(ref + '.' + pin.num);
-        const mh = /(\d+(?:\.\d+)?)\s*([pnuµm]?)H\b/.exec(ext);
-        if (mh && net && !(pin.role === 'switch' && (NV.V.has(net) || NV.ground.has(net)))) {
+        const SCALE = { p: 1e-12, n: 1e-9, u: 1e-6, 'µ': 1e-6, m: 1e-3, '': 1 };
+        // Every inductance the note names: "1 µH or 2.2 µH (effective 0.7 µH to 4.3 µH)" allows any of them, and
+        // anything between the smallest and the largest.
+        const hs = [...ext.matchAll(/(\d+(?:\.\d+)?)\s*([pnuµm]?)H\b/g)].map(x => parseFloat(x[1]) * SCALE[x[2]]);
+        if (hs.length && net && !(pin.role === 'switch' && (NV.V.has(net) || NV.ground.has(net)))) {
           tick('parts.ext');
-          const wantL = parseFloat(mh[1]) * ({ p: 1e-12, n: 1e-9, u: 1e-6, 'µ': 1e-6, m: 1e-3, '': 1 })[mh[2]];
+          const wantL = hs[0], loL = Math.min(...hs), hiL = Math.max(...hs);
+          const okL = v => (v >= loL * 0.999 && v <= hiL * 1.001) || hs.some(h => Math.abs(v - h) <= 0.2 * h);
           const inds = (M.nets.get(net) || []).map(n => M.parts.get(n.ref)).filter(q => q && q.kind === 'inductor').map(q => ({ ref: q.ref, v: (passiveValue(q, 'H') || {}).v }));
           if (!inds.length) add('parts.ext', 'error', ref + ' ' + pin.name + ' needs a ' + P.fmt(wantL, 'H') + ' inductor; none is on ' + net, 'The part file says: ' + pin.ext + '. Nothing on ' + net + ' is an inductor' + (pin.role === 'switch' ? ', so this switch pin drives nothing (check it isn\'t swapped with the supply input)' : '') + '.', { refs: [ref], pins: [ref + '.' + pin.num], nets: [net], basis: [{ file: f.id, mpn: f.mpn, k: 'pin ' + pin.num + ' ext', on: '', page: null, verified: false }] });
-          else if (inds.every(x => x.v != null && Math.abs(x.v - wantL) > 0.5 * wantL)) add('parts.ext', 'warn', ref + ' ' + pin.name + ' wants ' + P.fmt(wantL, 'H') + '; ' + inds.map(x => x.ref + ' is ' + P.fmt(x.v, 'H')).join(', '), 'The part file says: ' + pin.ext + '.', { refs: [ref].concat(inds.map(x => x.ref)), pins: [ref + '.' + pin.num], nets: [net], basis: [{ file: f.id, mpn: f.mpn, k: 'pin ' + pin.num + ' ext', on: '', page: null, verified: false }] });
+          else if (inds.every(x => x.v != null && !okL(x.v))) add('parts.ext', 'warn', ref + ' ' + pin.name + ' wants ' + (hs.length > 1 && loL !== hiL ? P.fmt(loL, 'H') + ' to ' + P.fmt(hiL, 'H') : P.fmt(wantL, 'H')) + '; ' + inds.map(x => x.ref + ' is ' + P.fmt(x.v, 'H')).join(', '), 'The part file says: ' + pin.ext + '.', { refs: [ref].concat(inds.map(x => x.ref)), pins: [ref + '.' + pin.num], nets: [net], basis: [{ file: f.id, mpn: f.mpn, k: 'pin ' + pin.num + ' ext', on: '', page: null, verified: false }] });
         }
-        const m = /(\d+(?:\.\d+)?)\s*([pnuµm]?)F\b/i.exec(ext);
-        if (!m || !net) continue;
+        // Capacitances in the note. One after ≤, <, "at most", "up to", or "max" is a limit on what the pin may
+        // see ("≤ 10 pF on the pin"), not a part to fit. An optional part isn't required.
+        const fs_ = [...ext.matchAll(/(≤|<|=<|at most|up to|max(?:imum)?\.?|less than|below)?\s*(\d+(?:\.\d+)?)\s*([pnuµm]?)F\b/gi)]
+          .map(x => ({ v: parseFloat(x[2]) * SCALE[x[3].toLowerCase()], max: !!x[1] }));
+        if (!fs_.length || !net) continue;
+        const capMax = fs_.find(x => x.max), capNeed = /\boptional\b/i.test(ext) ? null : fs_.find(x => !x.max);
+        // "between CP and BATT": a capacitor from this pin to another pin of the part, not to ground.
+        const btw = /between\s+(\w+)\s+and\s+(\w+)/i.exec(ext);
+        const otherName = btw && [btw[1], btw[2]].find(x => x.toUpperCase() !== String(pin.name).toUpperCase() && !/^(GND|VSS|ground|AGND|PGND)$/i.test(x));
         tick('parts.ext');
-        const want = parseFloat(m[1]) * ({ p: 1e-12, n: 1e-9, u: 1e-6, 'µ': 1e-6, m: 1e-3, '': 1 })[m[2].toLowerCase()];
+        if (otherName && capNeed) {
+          const op = f.pins.find(x => String(x.name).toUpperCase() === otherName.toUpperCase());
+          const oNet = op && M.netOf.get(ref + '.' + op.num);
+          if (!oNet) continue;
+          const across = (M.nets.get(net) || []).map(n => M.parts.get(n.ref)).filter(q => q && q.kind === 'capacitor').filter(q => { const e = twoPin(M, q); return e && e.includes(oNet); }).map(q => ({ ref: q.ref, v: (passiveValue(q, 'F') || {}).v }));
+          const tot = across.reduce((s, c) => s + (c.v || 0), 0);
+          if (tot < capNeed.v * 0.8) add('parts.ext', 'warn', ref + ' ' + pin.name + ' needs ' + P.fmt(capNeed.v, 'F') + ' to ' + op.name + '; ' + (across.length ? 'it has ' + P.fmt(tot, 'F') : 'there is none'), 'The part file says: ' + pin.ext + '. Capacitors between ' + net + ' and ' + oNet + ': ' + (across.length ? across.map(c => c.ref + ' ' + (c.v != null ? P.fmt(c.v, 'F') : '?')).join(', ') : 'none') + '.', { refs: [ref].concat(across.map(c => c.ref)), pins: [ref + '.' + pin.num, ref + '.' + op.num], nets: [net, oNet], basis: [{ file: f.id, mpn: f.mpn, k: 'pin ' + pin.num + ' ext', on: '', page: null, verified: false }] });
+          continue;
+        }
         const caps = capsOn(net);
         const total = caps.reduce((s, c) => s + (c.v || 0), 0);
+        if (capMax && total > capMax.v * 1.001) add('parts.ext', 'warn', ref + ' ' + pin.name + ' may see at most ' + P.fmt(capMax.v, 'F') + '; its net has ' + P.fmt(total, 'F'), 'The part file says: ' + pin.ext + '. Capacitors to ground on ' + net + ': ' + caps.map(c => c.ref + ' ' + (c.v != null ? P.fmt(c.v, 'F') : '?')).join(', ') + '.', { refs: [ref].concat(caps.map(c => c.id)), pins: [ref + '.' + pin.num], nets: [net], basis: [{ file: f.id, mpn: f.mpn, k: 'pin ' + pin.num + ' ext', on: '', page: null, verified: false }] });
+        if (!capNeed) continue;
+        const want = capNeed.v;
         const toGnd = /to\s+(GND|ground|VSS)/i.test(pin.ext) || !/\bto\b/i.test(pin.ext);
-        if (toGnd && total < want * 0.8) add('parts.ext', 'warn', ref + ' ' + pin.name + ' needs ' + P.fmt(want, 'F') + '; its net has ' + P.fmt(total, 'F'), 'The part file says: ' + pin.ext + '. Capacitors to ground on ' + net + ': ' + (caps.length ? caps.map(c => c.ref + ' ' + (c.v != null ? P.fmt(c.v, 'F') : '?')).join(', ') : 'none') + '.', { refs: [ref].concat(caps.map(c => c.ref)), pins: [ref + '.' + pin.num], nets: [net], basis: [{ file: f.id, mpn: f.mpn, k: 'pin ' + pin.num + ' ext', on: '', page: null, verified: false }] });
+        if (toGnd && total < want * 0.8) add('parts.ext', 'warn', ref + ' ' + pin.name + ' needs ' + P.fmt(want, 'F') + '; its net has ' + P.fmt(total, 'F'), 'The part file says: ' + pin.ext + '. Capacitors to ground on ' + net + ': ' + (caps.length ? caps.map(c => c.ref + ' ' + (c.v != null ? P.fmt(c.v, 'F') : '?')).join(', ') : 'none') + '.', { refs: [ref].concat(caps.map(c => c.id)), pins: [ref + '.' + pin.num], nets: [net], basis: [{ file: f.id, mpn: f.mpn, k: 'pin ' + pin.num + ' ext', on: '', page: null, verified: false }] });
       }
 
       // Regulators: capacitors and inductor.
@@ -508,12 +583,12 @@
         const inds = [];
         for (const n of sw) for (const node of M.nets.get(n) || []) { const q = M.parts.get(node.ref); if (q && q.kind === 'inductor') { const e = twoPin(M, q); if (e) { inds.push(q); outTarget.push(e[0] === n ? e[1] : e[0]); } } }
         outTarget = [...new Set(outTarget.filter(Boolean))];
-        const sumCaps = nets => [].concat(...nets.map(capsOn)).filter((c, i, a) => a.findIndex(x => x.ref === c.ref) === i);
+        const sumCaps = nets => [].concat(...nets.map(capsOn)).filter((c, i, a) => a.findIndex(x => x.id === c.id) === i);
         const cout = val('reg.cout'), cin = val('reg.cin'), lr = val('reg.l'), cb = val('reg.cboot');
         if (cout && outTarget.length) {
           tick('parts.regulator');
           const caps = sumCaps(outTarget), total = caps.reduce((s, c) => s + (c.v || 0), 0);
-          if (cout.min != null && total < cout.min * 0.999) add('parts.regulator', 'warn', ref + ' output has ' + P.fmt(total, 'F') + ', below the ' + P.fmt(cout.min, 'F') + ' minimum', 'Nominal values on ' + outTarget.join(', ') + ' (' + (caps.map(c => c.ref).join(', ') || 'none') + '); a ceramic capacitor loses much of its value under DC bias, so the real figure is lower.' + (cout.cond ? ' Condition: ' + cout.cond + '.' : ''), { refs: [ref].concat(caps.map(c => c.ref)), nets: outTarget, basis: [basisOf(f, cout)] });
+          if (cout.min != null && total < cout.min * 0.999) add('parts.regulator', 'warn', ref + ' output has ' + P.fmt(total, 'F') + ', below the ' + P.fmt(cout.min, 'F') + ' minimum', 'Nominal values on ' + outTarget.join(', ') + ' (' + (caps.map(c => c.ref).join(', ') || 'none') + '); a ceramic capacitor loses much of its value under DC bias, so the real figure is lower.' + (cout.cond ? ' Condition: ' + cout.cond + '.' : ''), { refs: [ref].concat(caps.map(c => c.id)), nets: outTarget, basis: [basisOf(f, cout)] });
           if (cout.max != null && total > cout.max * 1.001) add('parts.regulator', 'warn', ref + ' output has ' + P.fmt(total, 'F') + ', above the ' + P.fmt(cout.max, 'F') + ' maximum', 'On ' + outTarget.join(', ') + '. Too much output capacitance can upset the loop or the start-up.', { refs: [ref], nets: outTarget, basis: [basisOf(f, cout)] });
         } else if (outTarget.length) skip('parts.regulator');
         if (cin && inNets.length && (cin.value != null || cin.min != null)) {

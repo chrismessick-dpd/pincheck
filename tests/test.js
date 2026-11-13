@@ -201,6 +201,59 @@
     const f = CK.run(mini.design, lib2).findings.find(x => x.check === 'io.absmax');
     eq([f.severity, f.unverified], ['warn', true]); ok(/unverified MCU1 io\.absmax \(VDD\)/.test(f.detail));
   });
+  // A made-up board for the false alarms a real board turned up (2026-11-13): rails named V1.8CORE, a fixed
+  // regulator sensing its output on FB, a pad numbered PAD in the file and 9 on the symbol, a gauge fed through a
+  // 10 Ω filter from a connector classed an IC by its name, caps past a 0 Ω link, notes with limits and options, and a USB supply with USB unused.
+  const quirks = () => {
+    const pin = (num, name, type) => ({ num, name, type });
+    const two = (ref, kind, value) => ({ ref, mpn: '', kind, params: { Value: value }, pins: [pin('1', '1', 'passive'), pin('2', '2', 'passive')] });
+    const parts = [
+      { ref: 'U1', mpn: 'FIXREG', kind: 'ic', params: {}, pins: [pin('1', 'VIN', 'power'), pin('2', 'GND', 'power'), pin('3', 'SW', 'output'), pin('4', 'FB', 'input'), pin('9', 'EXP', 'passive')] },
+      { ref: 'U2', mpn: 'GAUGE', kind: 'ic', params: {}, pins: [pin('1', 'BATT', 'power'), pin('2', 'CP', 'passive'), pin('3', 'CFG', 'input'), pin('4', 'GND', 'power'), pin('5', 'DVDT', 'passive')] },
+      { ref: 'U3', mpn: 'MCU2', kind: 'ic', params: {}, pins: [pin('1', 'VDD', 'power'), pin('2', 'VDDUSB', 'power'), pin('3', 'PA11', 'io'), pin('4', 'VSS', 'power')] },
+      { ref: 'JUSB1', mpn: 'HDR2', kind: 'ic', params: {}, pins: [pin('1', '1', 'passive'), pin('2', '2', 'passive')] },
+      two('L1', 'inductor', '2.2uH'), two('R1', 'resistor', '0'), two('R2', 'resistor', '10 Ohms'), two('C1', 'capacitor', '10uF'),
+      two('C2', 'capacitor', '0.1uF'), two('C3', 'capacitor', '1uF'), two('R3', 'resistor', '10k'),
+    ];
+    const nets = [
+      { name: 'VBAT_WIRE', nodes: [{ ref: 'JUSB1', pin: '1' }, { ref: 'R2', pin: '1' }, { ref: 'U1', pin: '1' }] },
+      { name: 'GND', nodes: [{ ref: 'JUSB1', pin: '2' }, { ref: 'U1', pin: '2' }, { ref: 'U1', pin: '9' }, { ref: 'U2', pin: '4' }, { ref: 'U3', pin: '4' }, { ref: 'C1', pin: '2' }, { ref: 'C3', pin: '2' }, { ref: 'R3', pin: '2' }] },
+      { name: 'SW1', nodes: [{ ref: 'U1', pin: '3' }, { ref: 'L1', pin: '1' }] },
+      { name: 'NetFB', nodes: [{ ref: 'U1', pin: '4' }, { ref: 'L1', pin: '2' }, { ref: 'C1', pin: '1' }, { ref: 'R1', pin: '1' }] },
+      { name: 'V1.8CORE', nodes: [{ ref: 'R1', pin: '2' }, { ref: 'U3', pin: '1' }, { ref: 'U3', pin: '2' }] },
+      { name: 'VBAT_CHG', nodes: [{ ref: 'R2', pin: '2' }, { ref: 'U2', pin: '1' }, { ref: 'C2', pin: '2' }, { ref: 'C3', pin: '1' }] },
+      { name: 'CP_CHG', nodes: [{ ref: 'U2', pin: '2' }, { ref: 'C2', pin: '1' }] },
+      { name: 'CFG', nodes: [{ ref: 'U2', pin: '3' }, { ref: 'R3', pin: '1' }] },
+      { name: 'AMISO', nodes: [{ ref: 'U3', pin: '3' }] },
+    ];
+    const ok_ = { by: 't' };
+    const file = (mpn, kind, pins, values, domains) => ({ schema: 'pincheck.part/1', id: mpn.toLowerCase(), mpn, kind, match: [], pins, values, domains, datasheet: {} });
+    const lib2 = [
+      file('FIXREG', 'regulator', [{ num: '1', name: 'VIN', role: 'power-in', domain: 'VIN' }, { num: '2', name: 'GND', role: 'ground' }, { num: '3', name: 'SW', role: 'switch', ext: 'Inductor to VOUT, 1 µH or 2.2 µH (effective 0.7 µH to 4.3 µH)' }, { num: '4', name: 'FB', role: 'feedback' }, { num: 'PAD', name: 'Thermal Pad', role: 'pad' }],
+        [{ k: 'reg.vout', typ: 1.8, unit: 'V', ok: ok_ }], ['VIN']),
+      file('GAUGE', 'ic', [{ num: '1', name: 'BATT', role: 'power-in', domain: 'BATT' }, { num: '2', name: 'CP', role: 'other', ext: '0.1 µF between CP and BATT, 10 V rating minimum' }, { num: '3', name: 'CFG', role: 'input', domain: 'BATT', ext: 'Resistor to GND, ≤ 10 pF on the pin' }, { num: '4', name: 'GND', role: 'ground' }, { num: '5', name: 'DVDT', role: 'other', ext: 'Optional CdVdt to GND; add 100 Ω in series above 10 nF' }],
+        [], ['BATT']),
+      file('MCU2', 'mcu', [{ num: '1', name: 'VDD', role: 'power-in', domain: 'VDD' }, { num: '2', name: 'VDDUSB', role: 'power-in', domain: 'VDDUSB' }, { num: '3', name: 'PA11', role: 'io', domain: 'VDD', functions: ['USB_DM', 'SPI1_MISO'] }, { num: '4', name: 'VSS', role: 'ground' }],
+        [{ k: 'supply.range', on: 'VDDUSB', min: 3, max: 3.6, unit: 'V', cond: 'USB used', ok: ok_ }, { k: 'supply.tied', list: ['VDDUSB to VDD (or VSS) when USB is unused'], ok: ok_ }, { k: 'dec.c', on: 'VDD', value: 1e-6, unit: 'F', ok: ok_ }], ['VDD', 'VDDUSB']),
+      // A connector named JUSB1 is classed an IC by its designator; its part file says connector, so it still feeds a rail.
+      file('HDR2', 'connector', [{ num: '1', name: '1', role: 'other' }, { num: '2', name: '2', role: 'other' }], [], []),
+    ];
+    return { design: { parts, nets, sheets: [], notes: [] }, lib: lib2 };
+  };
+  t('checks: rail names, a fixed output on FB, pads, series feeds, 0 Ω links, and notes read as written', () => {
+    const q = quirks(), r = CK.run(q.design, q.lib);
+    const v = n => (r.rails.find(x => x.net === n) || {}).v;
+    eq([v('V1.8CORE'), v('NetFB')], [1.8, 1.8], 'V1.8CORE by name, NetFB from FIXREG on its FB pin');
+    eq(['V3.3IO', 'V1.8MCU', '+V1.8_INT', 'V5USB', 'SMPS1.8'].map(CK.voltageFromName), [3.3, 1.8, 1.8, null, null]);
+    const left = r.findings.filter(f => !/^library\./.test(f.check)).map(f => f.check + ': ' + f.title);
+    eq(left, [], 'nothing to report');
+    // Take C2 away and the CP note is checked between CP and BATT, not to ground.
+    q.design.nets.find(n => n.name === 'CP_CHG').nodes.pop(); q.design.nets.find(n => n.name === 'VBAT_CHG').nodes.splice(2, 1);
+    ok(CK.run(q.design, q.lib).findings.some(f => f.check === 'parts.ext' && /U2 CP needs 100 nF to BATT; there is none/.test(f.title)), 'missing CP capacitor');
+    // USB wired: PA11 meets a USB_DM pin, so VDDUSB at 1.8 V is out of range.
+    const q2 = quirks(); q2.design.nets.find(n => n.name === 'AMISO').name = 'USB_DM';
+    ok(CK.run(q2.design, q2.lib).findings.some(f => f.check === 'supply.range' && /VDDUSB/.test(f.title)), 'VDDUSB checked when USB is wired');
+  });
   t('XML reader: entities and CDATA', () => {
     const d = PK.kicad.xml('<a x="1 &amp; 2"><b>&lt;3</b><![CDATA[<raw>]]></a>');
     eq(d.kids[0].attrs.x, '1 & 2'); eq(d.kids[0].kids[0].text, '<3'); eq(d.kids[0].text, '<raw>');

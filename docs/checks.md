@@ -45,9 +45,11 @@ schematic part is `design.parts.find(p => p.ref === ref).schRef` (`U19.2` → `U
 Worked out before the checks, each with where it came from:
 
 1. **Ground:** nets a ground pin is on, or named GND, VSS, AGND, PGND, and the like: 0 V.
-2. **Regulator outputs:** a part file's `reg.vout`; or, for an adjustable part, `reg.vref` × (1 + Rtop/Rbottom)
-   from the divider on its feedback pin, set on the net the top resistor goes to.
-3. **Net names** that state a voltage ("3V3", "+5V", "VCC_1V8", "24V"), when nothing better sets one.
+2. **Regulator outputs:** a part file's `reg.vout` on its power-out pins, or on its FB pin when it has no output pin
+   and no resistor from FB to ground (a fixed part like the TPS62231 senses its output there); or, for an adjustable
+   part, `reg.vref` × (1 + Rtop/Rbottom) from the divider on its feedback pin, set on the net the top resistor goes to.
+3. **Net names** that state a voltage ("3V3", "+5V", "VCC_1V8", "24V", and "V1.8MCU" or "V3.3IO": a V, a voltage with
+   a decimal point, then any name), when nothing better sets one.
 4. **Through parts that pass DC:** resistors of 1 Ω or less, ferrite beads, inductors, fuses, and load
    switches and eFuses (assumed on), from a net with a voltage to one without.
 
@@ -66,3 +68,21 @@ an open pin that's fine on this board). One finding, or every finding like it: t
 channel suffixes are dropped (`U5.1` on `BUS_RX.1` is like `U5.2` on `BUS_RX.2`). Waivers are kept in the
 browser per design name, as Fabcheck's are; waived findings leave the counts and show under Waived, where they
 can be restored. Severities don't change for being waivable: an open VBAT is an error you waive if it's fine.
+
+## How a few checks read the board (2026-11-13)
+
+From a run on a real board whose false alarms these fixed:
+
+- **A supply pin is on a rail** when its net, or one reached through an inductor, bead, fuse, or a series resistor up to
+  1 kΩ (a 10 Ω filter on a gauge's BATT, the 1 kΩ to a MAX17335's PCKP), has a source. The resistor feeds the pin; its
+  voltage isn't carried through (only 1 Ω or less is). A part counts as a connector when its part file's kind says so, even
+  when its designator (JUSB1) made it look like an IC.
+- **Capacitors past a 0 Ω link count** for decoupling, regulator input and output capacitance, and pin notes: a 1 Ω or
+  smaller resistor makes one node. They're listed as "C1 (past R3)".
+- **Pin notes (`ext`)** are read as written: a capacitance after ≤, <, "at most", "up to", or "max" is a limit on what the
+  pin may see; an "Optional" part isn't required; "0.1 µF between CP and BATT" looks for a capacitor between those two
+  pins; every inductance named counts ("1 µH or 2.2 µH", "22 µH to 47 µH").
+- **An exposed pad** the file numbers PAD (or EP) takes the net of the symbol's pad pin (EP, EXP, PAD, THERMAL, and the like).
+- **`supply.tied`** reads "VDDUSB to VDD (or VSS)" as VDDUSB and VDD; what follows "or" is a choice.
+- **A range for when a feature is used** (`cond` "USB used") applies only when the feature is wired: a pin offering it is on
+  a net named for it, or meets another part's pin named for it.
