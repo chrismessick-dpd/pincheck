@@ -45,6 +45,19 @@
     if (!app.classList.contains('nav-open') || e.target !== app) return;
     app.classList.remove('nav-open'); e.preventDefault(); e.stopPropagation();
   }, true);
+  // Findings: Esc closes the detail panel; up and down step through the rows shown, opening each.
+  document.addEventListener('keydown', e => {
+    if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input, textarea, select, [contenteditable]') || document.querySelector('.sheet-wrap')) return;
+    if (e.key === 'Escape' && state.openFinding && $('#inspector').classList.contains('open')) { e.preventDefault(); closeInspector(); return; }
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && state.view === 'design' && (state.tab === 'findings' || state.tab === 'overview')) {
+      const rows = [...document.querySelectorAll('#view .pk-frow')].filter(r => r.offsetParent);
+      if (!rows.length) return;
+      e.preventDefault();
+      const i = rows.findIndex(r => r.dataset.id === state.openFinding), down = e.key === 'ArrowDown';
+      const next = rows[i < 0 ? (down ? 0 : rows.length - 1) : Math.max(0, Math.min(rows.length - 1, i + (down ? 1 : -1)))];
+      if (next.dataset.id !== state.openFinding) { state.openFinding = next.dataset.id; renderView(); const r = document.querySelector('#view .pk-frow[data-id="' + CSS.escape(next.dataset.id) + '"]'); if (r) r.scrollIntoView({ block: 'nearest' }); }
+    }
+  });
   document.addEventListener('keydown', e => {
     if (e.key !== '[' || e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input, textarea, select, [contenteditable]') || document.querySelector('.sheet-wrap')) return;
     e.preventDefault(); toggleSidebar();
@@ -424,7 +437,26 @@
   }
   const ago = t => { const s = Math.round((Date.now() - t) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : Math.round(s / 3600) + ' h ago'; };
 
-  function renderView() {
+  function renderView() { drawView(); syncInspector(); }
+
+  // A selected finding's detail panel on Overview and Findings (findings.js inspector), with its thumbnail
+  // on the schematic (viewer.js preview). Redrawn only when the finding or its run changes.
+  let inspShown = null;
+  function syncInspector() {
+    const el = $('#inspector'), d = active();
+    const f = state.view === 'design' && d && d.run && (state.tab === 'findings' || state.tab === 'overview') && state.openFinding
+      ? d.run.findings.find(x => x.id === state.openFinding) : null;
+    if (!f) { el.classList.remove('open'); inspShown = null; return; }
+    if (inspShown !== f || !el.classList.contains('open')) {
+      el.innerHTML = PK.pages.inspector(d, f, { hasSheets: !!d.sheetsDrawn });
+      el.classList.add('open');
+      if (PK.viewer && !PK.viewer.preview(el.querySelector('.insp-prev-slot'), d, f)) { const b = el.querySelector('.insp-preview'); if (b) b.remove(); }
+      inspShown = f;
+    }
+  }
+  function closeInspector() { if (!state.openFinding) return; state.openFinding = null; renderView(); }
+
+  function drawView() {
     const v = $('#view');
     if (state.busy) { v.innerHTML = '<div class="page"><div class="card pk-busy"><div class="pk-spin"></div><div>' + esc(state.busy) + '</div></div></div>'; return; }
     if (state.view === 'library') { v.innerHTML = libraryPage(); return; }
@@ -533,7 +565,11 @@
   // ── Events ──
   document.addEventListener('click', async e => {
     const t = e.target.closest('[data-act],[data-design],[data-config],[data-filter],[data-edit],[data-alias],[data-tab],[data-sev],[data-sevonly],[data-fopen],[data-openfile],[data-show],[data-waive],[data-unwaive]');
-    if (!t) return;
+    if (!t) {
+      // A click on blank space in the page (nothing to click or type in, no text selected) closes the detail panel.
+      if (state.openFinding && e.target.closest('#main') && !e.target.closest('a, button, input, select, textarea, label, summary, [contenteditable], [tabindex], canvas, .sheet-wrap') && !String(window.getSelection())) closeInspector();
+      return;
+    }
     if (t.dataset.design) { state.active = t.dataset.design; state.view = 'design'; $('#app').classList.remove('nav-open'); renderAll(); return; }
     if (t.dataset.config) { configure(t.dataset.config); return; }
     if (t.dataset.filter) { state.filter = t.dataset.filter; renderView(); return; }
@@ -541,7 +577,16 @@
     if (t.dataset.sev) { state.sev = Object.assign({}, state.sev, { [t.dataset.sev]: !state.sev[t.dataset.sev] }); renderView(); return; }
     if (t.dataset.sevonly) { state.sev = { error: false, warn: false, info: false, [t.dataset.sevonly]: true }; state.tab = 'findings'; renderTabs(); renderView(); return; }
     if (t.dataset.fopen) { state.openFinding = state.openFinding === t.dataset.fopen ? null : t.dataset.fopen; renderView(); return; }
-    if (t.dataset.show && PK.viewer) { const d = active(); const f = d && d.run && d.run.findings.find(x => x.id === t.dataset.show); if (f) { state.tab = 'schematic'; state.showFinding = f; renderTabs(); renderView(); } return; }
+    if (t.dataset.show && PK.viewer) {
+      const d = active(); const f = d && d.run && d.run.findings.find(x => x.id === t.dataset.show);
+      if (f) {
+        // From the detail panel, the thumbnail grows into the Schematic tab's view of the finding.
+        const zoom = t.closest('#inspector') ? PK.viewer.zoomFromPreview() : null;
+        state.tab = 'schematic'; state.showFinding = f; renderTabs(); renderView(); $('#main').scrollTop = 0;
+        if (zoom) zoom();
+      }
+      return;
+    }
     if (t.dataset.waive) { const d = active(); const f = d && d.run.findings.find(x => x.id === t.dataset.waive); if (f) waiveSheet(d, f); return; }
     if (t.dataset.unwaive) { const d = active(); const f = d && d.run.findings.find(x => x.id === t.dataset.unwaive); if (f && f.waived) { saveWaivers(d, loadWaivers(d).filter(w => !(w.key === f.waived.key && w.at === f.waived.at))); applyWaivers(d); renderTabs(); renderView(); toast('Restored'); } return; }
     if (t.dataset.openfile) { const f = state.lib.find(x => x.id === t.dataset.openfile); const d = active(); const part = d && t.dataset.ref ? d.parts.find(p => p.ref === t.dataset.ref) : null; if (f) editPart(f, part, false); return; }
@@ -553,7 +598,8 @@
       await L.save(f); await reloadLib(); scheduleSync(); return;
     }
     const a = t.dataset.act;
-    if (a === 'nav') toggleSidebar();
+    if (a === 'close-insp') closeInspector();
+    else if (a === 'nav') toggleSidebar();
     else if (a === 'home') { state.view = 'home'; renderAll(); }
     else if (a === 'open') { const i = $('#file-input'); i.value = ''; i.click(); }
     else if (a === 'open-dir') { const i = $('#dir-input'); i.value = ''; i.click(); }

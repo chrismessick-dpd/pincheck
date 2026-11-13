@@ -95,20 +95,37 @@
     return h + '</div>';
   }
 
+  // One line per finding; a click selects it and opens the detail panel (inspector, below) on the right
+  // (Chris, 2026-11-13: rows stay collapsed, as Fabcheck's do).
   function row(f, open, ctx) {
     const chips = f.refs.slice(0, 8).map(r => '<span class="tag pk-mono">' + esc(r) + '</span>').join('') + (f.refs.length > 8 ? '<span class="tag">+' + (f.refs.length - 8) + '</span>' : '') +
       f.nets.slice(0, 4).map(n => '<span class="tag pk-mono pk-tag-net">' + esc(n) + '</span>').join('');
-    let h = '<div class="pk-frow' + (open ? ' open' : '') + '"><button class="pk-fhead" data-fopen="' + esc(f.id) + '">' + sevPill(f.severity) + '<span class="pk-ftitle">' + esc(f.title) + (f.unverified ? ' <span class="pk-tag-unv" title="Rests on a part-file value nobody has verified">unverified</span>' : '') + (f.waived ? ' <span class="pk-tag-waived">waived</span>' : '') + '</span></button>' +
-      '<div class="pk-fchips">' + chips + '</div>';
-    if (open) {
-      h += '<div class="pk-fbody"><p>' + esc(f.detail) + '</p>';
-      if (f.waived) h += '<p class="pk-wnote"><b>Waived</b> by ' + esc(f.waived.by) + ', ' + esc((f.waived.at || '').slice(0, 10)) + (f.waived.scope === 'similar' ? ' (with every finding like it)' : '') + ': ' + esc(f.waived.reason) + '</p>';
-      if (f.basis.length) h += '<div class="pk-basis"><b>Rests on</b><ul>' + f.basis.map(b => '<li><span class="pk-mono">' + esc(b.mpn) + '</span> ' + esc(b.k) + (b.on ? ' (' + esc(b.on) + ')' : '') + (b.page ? ', datasheet p.' + esc(b.page) : '') + ' — ' + (b.verified ? '✓ verified' : '<span class="pk-tag-unv">unverified</span>') + ' <button class="pk-link" data-openfile="' + esc(b.file) + '" data-ref="' + esc(f.refs[0] || '') + '">Open part file</button></li>').join('') + '</ul></div>';
-      h += '<div class="pk-btns">' + (window.PK.viewer && ctx.hasSheets ? '<button class="btn btn-sm" data-show="' + esc(f.id) + '">Show on schematic</button>' : '') +
-        (f.refs[0] ? '<button class="btn btn-sm" data-config="' + esc(f.refs[0]) + '">Open ' + esc(f.refs[0]) + '\'s part</button>' : '') + (f.waived ? '<button class="btn btn-sm" data-unwaive="' + esc(f.id) + '">Restore</button>' : '<button class="btn btn-sm" data-waive="' + esc(f.id) + '">Waive…</button>') + '<span class="pk-muted pk-mono">' + esc(f.check) + '</span></div></div>';
-    }
+    return '<div class="pk-frow' + (open ? ' open' : '') + '" data-id="' + esc(f.id) + '" data-fopen="' + esc(f.id) + '"><button class="pk-fhead" data-fopen="' + esc(f.id) + '" aria-pressed="' + open + '">' + sevPill(f.severity) + '<span class="pk-ftitle">' + esc(f.title) + (f.unverified ? ' <span class="pk-tag-unv" title="Rests on a part-file value nobody has verified">unverified</span>' : '') + (f.waived ? ' <span class="pk-tag-waived">waived</span>' : '') + '</span></button>' +
+      '<div class="pk-fchips">' + chips + '</div></div>';
+  }
+
+  // The detail panel: the finding, a thumbnail of it on the schematic (filled by PK.viewer.preview into
+  // .insp-prev-slot; a click zooms into the Schematic tab), Open in schematic under it, then what it rests on.
+  const X = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 5l10 10M15 5L5 15"/></svg>';
+  function inspector(d, f, ctx) {
+    const c = C.byKey.get(f.check);
+    const onSheet = ctx.hasSheets && window.PK.viewer && PK.viewer.hitsOf(d, f).length > 0;
+    let h = '<div class="insp-head"><span class="insp-crumb">' + esc(f.group) + ' · ' + esc(c ? c.title : f.check) + '</span><button class="icon-btn" data-act="close-insp" aria-label="Close" title="Close (Esc)">' + X + '</button></div>' +
+      '<div class="insp-body">' + sevPill(f.severity) + (f.unverified ? ' <span class="pk-tag-unv" title="Rests on a part-file value nobody has verified">unverified</span>' : '') + (f.waived ? ' <span class="pk-tag-waived">waived</span>' : '') +
+      '<div class="insp-title">' + esc(f.title) + '</div>' + (f.detail ? '<div class="insp-detail">' + esc(f.detail) + '</div>' : '');
+    if (f.waived) h += '<p class="pk-wnote"><b>Waived</b> by ' + esc(f.waived.by) + ', ' + esc((f.waived.at || '').slice(0, 10)) + (f.waived.scope === 'similar' ? ' (with every finding like it)' : '') + ': ' + esc(f.waived.reason) + '</p>';
+    if (onSheet) h += '<button class="insp-preview" data-show="' + esc(f.id) + '" aria-label="Open in the schematic"><span class="insp-prev-slot"></span><span class="insp-prev-go">Open in schematic →</span></button>';
+    h += '<div class="pk-btns pk-insp-btns">' + (onSheet ? '<button class="btn btn-primary btn-sm" data-show="' + esc(f.id) + '">Open in schematic</button>' : '') +
+      (f.refs[0] ? '<button class="btn btn-sm" data-config="' + esc(f.refs[0]) + '">Open ' + esc(f.refs[0]) + '\'s part</button>' : '') +
+      (f.waived ? '<button class="btn btn-sm" data-unwaive="' + esc(f.id) + '">Restore</button>' : '<button class="btn btn-sm" data-waive="' + esc(f.id) + '">Waive…</button>') + '</div>';
+    const kv = [];
+    if (f.refs.length) kv.push(['Parts', f.refs.slice(0, 40).join(', ') + (f.refs.length > 40 ? ' …' : '')]);
+    if (f.nets.length) kv.push(['Nets', f.nets.slice(0, 20).join(', ') + (f.nets.length > 20 ? ' …' : '')]);
+    kv.push(['Check', f.check]);
+    h += '<dl class="kv">' + kv.map(([k, v]) => '<dt>' + k + '</dt><dd' + (k === 'Check' || k === 'Nets' ? ' class="pk-mono"' : '') + '>' + esc(v) + '</dd>').join('') + '</dl>';
+    if (f.basis.length) h += '<div class="pk-basis"><b>Rests on</b><ul>' + f.basis.map(b => '<li><span class="pk-mono">' + esc(b.mpn) + '</span> ' + esc(b.k) + (b.on ? ' (' + esc(b.on) + ')' : '') + (b.page ? ', datasheet p.' + esc(b.page) : '') + ' — ' + (b.verified ? '✓ verified' : '<span class="pk-tag-unv">unverified</span>') + ' <button class="pk-link" data-openfile="' + esc(b.file) + '" data-ref="' + esc(f.refs[0] || '') + '">Open part file</button></li>').join('') + '</ul></div>';
     return h + '</div>';
   }
 
-  PK.pages = { overview, findings, counts };
+  PK.pages = { overview, findings, counts, inspector };
 })(window.PK = window.PK || {});

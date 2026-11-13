@@ -34,6 +34,9 @@ the suite's hard rules.
   drawings. Every sheet is a thumbnail, all running at once during an 8 s replay of the run. Findings land
   as marks, and the finished bar is a slider to replay one check. The start page's empty panel is the drop
   target. See `docs/design.md`, *The scan panel*.
+- **Finding detail panel (2026-11-13, Chris: rows stay collapsed; a panel on the right like Fabcheck's, with a
+  thumbnail that zooms into the Schematic tab):** `PK.pages.inspector`, `PK.viewer.preview`, and
+  `zoomFromPreview`. See `docs/design.md`, *A finding's detail panel*.
 - Built 2026-11-13: an Altium project's folder or .zip opens whole (`assets/archive.js`; see `docs/design.md`, *Inputs*).
 - Altium nets come from the Protel2 netlist (`assets/protel.js`). What's not built yet: `docs/design.md`, *Not built yet*.
 - **Send to Signoff EE (2026-11-13, Chris: Fabcheck's Send, into the Schematic Review checklist, with stored

@@ -128,26 +128,45 @@ body.pk-dragging .pk-dropzone { display: grid; }
 .pk-fq { flex: 1; min-width: 220px; max-width: 420px; }
 .pk-fgroup { width: auto; max-width: 320px; }
 .pk-flist { padding: 2px 0; }
-.pk-frow { border-top: 1px solid var(--hair); padding: 8px 14px; }
+.pk-frow { border-top: 1px solid var(--hair); padding: 8px 14px; cursor: pointer; }
 .pk-frow:first-child { border-top: none; }
-.pk-frow.open { background: var(--bg-sunk); }
+.pk-frow.open { background: var(--accent-soft); }
+.pk-frow:not(.open):hover { background: var(--bg-sunk); }
 .pk-fhead { display: flex; align-items: flex-start; gap: 10px; width: 100%; border: none; background: none; padding: 2px 0; text-align: left; font: inherit; color: var(--text); cursor: pointer; }
 .pk-ftitle { font-size: 13.5px; line-height: 1.4; }
 .pk-fchips { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 0 96px; }
 .pk-fchips .tag { font-size: 11px; }
 .pk-tag-net { background: var(--accent-soft); color: var(--accent-ink); }
 .pk-tag-unv { font: 600 10.5px var(--sans); padding: 1px 6px; border-radius: 5px; border: 1px dashed var(--text-3); color: var(--text-2); white-space: nowrap; }
-.pk-fbody { margin: 8px 0 4px 96px; font-size: 13px; line-height: 1.55; color: var(--text-2); }
-.pk-fbody p { margin: 0 0 8px; }
 .pk-basis { font-size: 12.5px; margin-bottom: 10px; }
 .pk-basis b { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); margin-bottom: 2px; }
 .pk-basis ul { margin: 0; padding-left: 18px; }
 .pk-rails td { padding: 7px 14px; }
-@media (max-width: 860px) { .pk-fchips, .pk-fbody { margin-left: 0; } }
+@media (max-width: 860px) { .pk-fchips { margin-left: 0; } }
 .pk-tag-waived { font: 600 10.5px var(--sans); padding: 1px 6px; border-radius: 5px; background: var(--bg-sunk); color: var(--text-3); }
 .pk-wnote { font-size: 12.5px; padding: 6px 10px; border-left: 3px solid var(--hair-2); background: var(--bg-elev); }
 .pk-waived > summary { cursor: pointer; list-style: revert; }
 .pk-waived .pk-frow { opacity: 0.8; }
+
+/* ── A finding's detail panel (findings.js inspector; suite.css .inspector), as Fabcheck's ── */
+.inspector .pk-sev { vertical-align: middle; }
+.insp-detail { font-size: 13.5px; line-height: 1.55; color: var(--text-2); white-space: pre-wrap; word-break: break-word; margin-bottom: 14px; }
+.inspector .pk-wnote { margin: 0 0 14px; }
+/* The finding on its sheet, small; a click zooms into the Schematic tab. */
+.insp-preview { position: relative; display: block; width: 100%; padding: 0; margin: 2px 0 12px; border: 0; border-radius: 10px; overflow: hidden; background: var(--bg-sunk); cursor: zoom-in; box-shadow: 0 0 0 1px var(--hair); transition: box-shadow 0.2s var(--ease), transform 0.2s var(--ease); }
+.insp-preview:hover, .insp-preview:focus-visible { box-shadow: 0 0 0 2px var(--accent); outline: none; }
+.insp-preview:active { transform: scale(0.985); }
+.insp-prev-slot { display: block; }
+.sv-thumb { min-height: 0; height: 200px; }
+.sv-thumb .sv-tabs, .sv-thumb .sv-tools, .sv-thumb .sv-rail, .sv-thumb .sv-tip { display: none; }
+.sv-thumb .sv-canvas { pointer-events: none; cursor: inherit; }
+.insp-prev-go { position: absolute; right: 8px; bottom: 8px; font-size: 11.5px; font-weight: 600; line-height: 1; padding: 5px 8px; border-radius: 980px; color: #fff; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(6px); pointer-events: none; opacity: 0.85; transition: opacity 0.2s var(--ease), background 0.2s var(--ease); }
+.insp-preview:hover .insp-prev-go, .insp-preview:focus-visible .insp-prev-go { opacity: 1; background: var(--accent); color: var(--accent-contrast, #fff); }
+.pk-insp-btns { margin: 0 0 16px; }
+.zoom-shot { position: fixed; z-index: 60; pointer-events: none; transform-origin: center; will-change: transform, opacity; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; margin: 0 0 16px; }
+.kv dt { color: var(--text-3); }
+.kv dd { margin: 0; word-break: break-word; }
 
 /* ── Schematic view (assets/viewer.js): sheet tabs over a canvas, a findings rail on the right ── */
 .sv { display: flex; flex-direction: column; min-height: 320px; }

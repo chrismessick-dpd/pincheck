@@ -241,17 +241,18 @@
 
   // ── The viewer ──
   class Viewer {
-    constructor(d) {
-      this.d = d; this.si = 0; this.views = []; this.sel = null; this.hover = null; this.railOpen = true;
+    // thumb: the small, still picture in Findings' detail panel (no tabs, tools, rail, or pointer events).
+    constructor(d, thumb) {
+      this.d = d; this.si = 0; this.views = []; this.sel = null; this.hover = null; this.railOpen = true; this.thumb = !!thumb;
       const el = this.el = document.createElement('div');
-      el.className = 'sv';
+      el.className = thumb ? 'sv sv-thumb' : 'sv';
       el.__viewer = this;
       el.innerHTML = '<div class="sv-tabs" role="tablist"></div><div class="sv-body"><div class="sv-stage"><canvas class="sv-canvas" tabindex="0" aria-label="Schematic sheet"></canvas>' +
         '<div class="sv-tools"><button class="icon-btn" data-sv="in" title="Zoom in (+)" aria-label="Zoom in">+</button><button class="icon-btn" data-sv="out" title="Zoom out (−)" aria-label="Zoom out">−</button><button class="icon-btn" data-sv="fit" title="Fit the sheet (F)" aria-label="Fit the sheet"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg></button></div>' +
         '<div class="sv-tip" hidden></div></div><aside class="sv-rail"></aside></div>';
       this.canvas = el.querySelector('canvas'); this.ctx = this.canvas.getContext('2d');
       this.tip = el.querySelector('.sv-tip');
-      this.events();
+      if (!thumb) this.events();
       this.ro = new ResizeObserver(() => this.resize());
       this.ro.observe(el.querySelector('.sv-stage'));
       const mo = new MutationObserver(() => { colors = null; this.pat = null; this.draw(); });
@@ -274,6 +275,7 @@
     }
     // The viewer fills the main pane below the toolbar.
     size() {
+      if (this.thumb) return;
       const main = document.getElementById('main'), tb = document.getElementById('toolbar');
       if (main) this.el.style.height = Math.max(320, main.clientHeight - (tb ? tb.offsetHeight : 0)) + 'px';
     }
@@ -633,6 +635,7 @@
 
     // ── Sheet tabs and the findings rail ──
     renderTabs() {
+      if (this.thumb) return;
       const m = this.m;
       this.el.querySelector('.sv-tabs').innerHTML = m.sheets.map((s, i) => {
         const fs = this.sheetFindings(i), e = fs.filter(x => x.f.severity === 'error').length, w = fs.filter(x => x.f.severity === 'warn').length;
@@ -641,6 +644,7 @@
       }).join('');
     }
     renderRail() {
+      if (this.thumb) return;
       const rail = this.el.querySelector('.sv-rail');
       const list = this.sheetFindings(this.si);
       const sel = this.sel && this.live().find(f => f.id === this.sel);
@@ -734,15 +738,55 @@
       return;
     }
     if (!d._viewer) d._viewer = new Viewer(d);
-    // A rerun or a waiver brings new finding objects: forget their places.
-    const m = model(d);
-    if (m.hitRun !== d.run) { m.hitRun = d.run; m.hits.clear(); }
+    fresh(d);
     d._viewer.mount(container, state);
+  }
+  // A rerun or a waiver brings new finding objects: forget their places.
+  function fresh(d) { const m = model(d); if (m.hitRun !== d.run) { m.hitRun = d.run; m.hits.clear(); } return m; }
+
+  // ── The detail panel's thumbnail (Chris, 2026-11-13: as Fabcheck's) ──
+  // The finding framed as the Schematic tab will frame it, drawn small into slot. False when the design has
+  // no sheet drawings or the finding has no place on them.
+  let thumb = null;
+  function preview(slot, d, f) {
+    if (!slot || !d.drawings || !d.drawings.length) return false;
+    if (!hitsOf(fresh(d), f).length) return false;
+    if (!thumb || thumb.d !== d) thumb = new Viewer(d, true);
+    slot.replaceChildren(thumb.el);
+    thumb.views = []; thumb.cw = 0; thumb.pending = f.id;
+    thumb.resize();
+    return true;
+  }
+  // From the thumbnail to the Schematic tab: call before the tab is drawn (it copies the thumbnail), then
+  // call the returned function after: the copy grows into the tab's framing of the finding, then fades
+  // into the live sheet under it, as Fabcheck's preview does into its board.
+  function zoomFromPreview() {
+    const t = thumb, from = t && t.canvas.isConnected ? t.canvas.getBoundingClientRect() : null;
+    if (!from || from.width < 10 || reduced()) return () => {};
+    const shot = document.createElement('canvas');
+    shot.width = t.canvas.width; shot.height = t.canvas.height;
+    shot.getContext('2d').drawImage(t.canvas, 0, 0);
+    const pscale = (t.views[t.si] || {}).scale;
+    return () => {
+      const v = PK.viewer._active(), vv = v && v.views[v.si];
+      if (!v || !vv || !pscale) return;
+      const to = v.canvas.getBoundingClientRect(), k = vv.scale / pscale;
+      shot.className = 'zoom-shot';
+      Object.assign(shot.style, { left: from.left + 'px', top: from.top + 'px', width: from.width + 'px', height: from.height + 'px' });
+      document.body.appendChild(shot);
+      const dx = to.left + to.width / 2 - (from.left + from.width / 2), dy = to.top + to.height / 2 - (from.top + from.height / 2);
+      const a = shot.animate([
+        { transform: 'none', opacity: 1, borderRadius: '10px' },
+        { opacity: 1, offset: 0.55 },
+        { transform: 'translate(' + dx + 'px, ' + dy + 'px) scale(' + k + ')', opacity: 0, borderRadius: '0px' }
+      ], { duration: 560, easing: 'cubic-bezier(0.35, 0.7, 0.2, 1)', fill: 'forwards' });
+      a.onfinish = a.oncancel = () => shot.remove();
+    };
   }
 
   // Keys while the schematic shows: F fits, N and P step through findings, + and − zoom.
   document.addEventListener('keydown', e => {
-    const el = document.querySelector('.sv');
+    const el = document.querySelector('.sv:not(.sv-thumb)');
     if (!el || e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input, textarea, select, [contenteditable]') || document.querySelector('.sheet-wrap')) return;
     const v = PK.viewer._active();
     if (!v) return;
@@ -758,7 +802,7 @@
   window.addEventListener('resize', () => { const v = PK.viewer._active(); if (v) { v.size(); } });
 
   PK.viewer = {
-    render, model, hitsOf: (d, f) => hitsOf(model(d), f),
-    _active: () => { const el = document.querySelector('.sv'); return el ? el.__viewer || null : null; }
+    render, model, preview, zoomFromPreview, hitsOf: (d, f) => hitsOf(fresh(d), f),
+    _active: () => { const el = document.querySelector('.sv:not(.sv-thumb)'); return el ? el.__viewer || null : null; }
   };
 })(window.PK = window.PK || {});

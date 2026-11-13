@@ -105,6 +105,19 @@ In order, each needing only the netlist and part files:
 Every finding names the part file's value and page, and warns instead of failing when that value is
 unverified. Planted errors for the demo come with the checks.
 
+## A finding's detail panel (2026-11-13)
+
+Chris: findings stay one line each; a click opens a panel on the right, as Fabcheck's inspector does. On
+Overview and Findings a row (anywhere on it) selects its finding, and `PK.pages.inspector` draws the panel:
+severity, title, detail, a waiver note, a thumbnail of the finding on its sheet, *Open in schematic* with
+*Open U4's part* and *Waive…* under it, then Parts, Nets, Check, and what it rests on. The thumbnail is a
+second `Viewer` in thumb mode (`PK.viewer.preview`: no tabs, tools, rail, or pointer events), framed as the
+Schematic tab will frame the finding. Clicking it or *Open in schematic* switches to that tab, and
+`PK.viewer.zoomFromPreview` grows a copy of the thumbnail into the tab's view and fades it out, as Fabcheck's
+`openFromPreview` does. A design without sheet drawings (a KiCad netlist), or a finding with no place on
+them, gets no thumbnail or button. Esc, ×, or a click on blank page closes it; up and down step through the
+rows shown. A link from Signoff EE (`&finding=`) opens the panel on that finding.
+
 ## The schematic viewer (2026-11-13)
 
 Chris asked for a viewer like Fabcheck's Board that jumps to the findings on the schematic.
