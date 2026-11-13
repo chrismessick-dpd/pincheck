@@ -74,7 +74,7 @@ the suite's hard rules.
   not committed):** series resistors up to 1 kΩ join a signal (`seriesLinks`, `logicNode`), `io.vih` and the new `io.vil`
   use each side's own supply, `io.unpowered` traces rails to their sources (`railRoot`, `independent`), and parts not
   fitted (Altium variants, DNP) leave the checks, with a *Build variant* picker on Overview and Findings. New catalog key
-  `io.absmax.off`. Pushed `d045099`; the variant picker and the 2.5 s scan are not committed. See `docs/checks.md`, *Logic levels
+  `io.absmax.off`. Pushed `d045099`, then the variant picker and the 2.5 s scan `b2fe328`. See `docs/checks.md`, *Logic levels
   between parts*.
 
 ## Rules
