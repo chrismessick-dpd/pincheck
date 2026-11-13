@@ -85,7 +85,9 @@ the suite's hard rules.
   `../.claude/skills/`. Pincheck's Findings shows a design's latest scan above the offline findings (`assets/claude.js`),
   each item with Confirm, Not a problem, a reply, and Accept all, saved as the scan's `decisions.json`; the head's
   *Check with Claude…* writes the prompt. The demo has a made-up scan (`demo/claude-scan.json`). Ledger:
-  `docs/learned.md`. A netlist part now keeps the SchDoc sheets it's drawn on (`design.js`).
+  `docs/learned.md`. Then (2026-11-13, Chris: the skills downloaded from Pincheck, not a private repo; not committed):
+  *Download the skills* in Check with Claude and Batch configure zips `skill/` as `.claude/skills/<name>/SKILL.md`
+  (`PK.claude.downloadSkills`, a stored zip written in the page). A netlist part now keeps the SchDoc sheets it's drawn on (`design.js`).
 
 ## Rules
 
@@ -114,7 +116,7 @@ the suite's hard rules.
    change to `model.js` or `github.js`.
 2. `python tools/stamp_version.py`.
 3. Serve the tools folder (preview `signoff-suite-alt`, port 8774) and open `pincheck/tests/test.html`:
-   PASS (45 tests), and `node tests/scan_test.js` (4). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
+   PASS (45 tests), and `node tests/scan_test.js` (5). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
    three sheets.
 4. In the browser pane, scripts are cached: fetch changed files with `{cache: 'reload'}` first. The demo
    library is loaded into IndexedDB `pincheck-demo` once; delete that database to reload it.

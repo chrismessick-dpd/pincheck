@@ -771,7 +771,7 @@
         '<div class="card pk-scroll pk-batch"><table class="table"><thead><tr><th><input type="checkbox" data-b="all"' + (list.length === missing.length ? ' checked' : '') + ' aria-label="All parts"></th><th>Part number</th><th>Refs</th><th>Description</th><th class="pk-num">Pins</th></tr></thead><tbody>' +
         missing.map(g => '<tr><td><input type="checkbox" data-b="one" data-mpn="' + esc(g.mpn) + '"' + (on.has(g.mpn) ? ' checked' : '') + ' aria-label="' + esc(g.mpn) + '"></td><td class="pk-mono">' + esc(g.mpn) + '</td><td class="pk-refs">' + esc(g.refs.slice(0, 6).join(', ') + (g.refs.length > 6 ? ', …' : '')) + '</td><td class="pk-desc">' + esc(g.part.description || g.part.params.Value || '') + '</td><td class="pk-num">' + g.part.pins.length + '</td></tr>').join('') +
         '</tbody></table></div>' +
-        '<ol class="pk-steps"><li>Save the batch file (' + plural(list.length, 'part') + ', each with its pins from the schematic): <button class="btn btn-sm" data-b="export"' + (list.length ? '' : ' disabled') + '>Save ' + esc(file) + '</button></li>' +
+        '<ol class="pk-steps">' + (PK.claude ? '<li>' + PK.claude.SKILLS_STEP + '</li>' : '') + '<li>Save the batch file (' + plural(list.length, 'part') + ', each with its pins from the schematic): <button class="btn btn-sm" data-b="export"' + (list.length ? '' : ' disabled') + '>Save ' + esc(file) + '</button></li>' +
         '<li>Datasheets folder, for the prompt: <input class="input pk-dsdir" data-b="dir" placeholder="Leave empty and Claude asks for each datasheet" value="' + esc(dir) + '"></li>' +
         '<li>In Claude Code, started in the Dovetail tools folder, paste this: <button class="btn btn-sm" data-b="copy"' + (list.length ? '' : ' disabled') + '>Copy</button><pre class="pk-pre">' + esc(prompt()) + '</pre>Claude fills each part from its datasheet, every value with its page, all unverified. STM32s also come from STM32CubeMX’s database on this computer.</li>' +
         '<li>Back here, import the part files it wrote (select them all in <span class="pk-mono">' + esc(out) + '</span>), then check each part’s values against the pages and tick Verified: <button class="btn btn-sm" data-b="import">Import part files…</button></li></ol></div>' +
@@ -875,6 +875,7 @@
       else if (a === 'parts') { const texts = await C.partFiles(d); for (const [i, text] of texts.entries()) await importJson(text, C.get(d).parts[i]); }
     } catch (err) { toast(err.message, 'error'); renderView(); }
   }
+  document.addEventListener('click', e => { if (e.target.closest('[data-skills]') && PK.claude) PK.claude.downloadSkills().catch(err => toast(err.message, 'error')); });
   document.addEventListener('click', e => { const t = e.target.closest('[data-ck]'); if (t && !t.closest('.sheet-wrap') || (t && t.dataset.ck === 'reload')) claudeAct(t.dataset.ck, t); });
   // A reply is kept as it's typed (this browser), without redrawing the panel under the cursor.
   let replyTimer = null;

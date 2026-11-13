@@ -204,7 +204,7 @@
     w.className = 'sheet-wrap';
     const draw = () => {
       w.innerHTML = '<div class="sheet wide"><div class="sheet-head"><h2>Check with Claude</h2><p>The offline checks take under a second and need no connection. Claude takes longer and reads every datasheet: it runs the offline checks first, then reviews the whole project and writes down what they missed, got wrong, or lacked the data for. You confirm each item here, and the pincheck-improve skill makes the offline checks catch it next time.</p></div><div class="sheet-body">' +
-        '<ol class="pk-steps"><li>The project\'s folder on this computer (with its Protel2 netlist, or a KiCad XML netlist): <input class="input pk-dsdir" data-ck-dir placeholder="Leave empty and Claude asks for it" value="' + esc(dir) + '"></li>' +
+        '<ol class="pk-steps"><li>' + SKILLS_STEP + '</li><li>The project\'s folder on this computer (with its Protel2 netlist, or a KiCad XML netlist): <input class="input pk-dsdir" data-ck-dir placeholder="Leave empty and Claude asks for it" value="' + esc(dir) + '"></li>' +
         '<li>In Claude Code, started in the Dovetail tools folder, paste this: <button class="btn btn-sm" data-ck="copy">Copy</button><pre class="pk-pre">' + esc(prompt(d, dir)) + '</pre>Claude downloads missing datasheets from the makers\' sites and fills their part files (unverified), reviews every sheet, and asks before storing the scan in pincheck_data.</li>' +
         '<li>Back here, on Findings, <b>Look again</b> shows the scan beside the offline findings. Confirm each item or mark it Not a problem (or Accept all), reply where it helps, and Save answers. Import the scan\'s part files from there too.</li>' +
         '<li>Then, in Claude Code: <span class="pk-mono">Use the pincheck-improve skill on the latest scan of ' + esc(d.name) + '</span>. It builds what you confirmed and stops at a diff for you.</li></ol></div>' +
@@ -226,5 +226,49 @@
     });
   }
 
-  PK.claude = { load, get, fromFile, answers, unsaved, answer, acceptAll, save, partFiles, section, inspector, item, findingLike, sheet, prompt, TYPES };
+  // ── The Claude skills, downloaded from Pincheck itself (Chris, 2026-11-13) ──
+  // A zip of skill/ as .claude/skills/<name>/SKILL.md: unzipped in the folder Claude Code starts in, it installs
+  // all three. Stored (no compression), written here since the page loads no libraries.
+  const SKILLS = [['pincheck-part', 'skill/SKILL.md'], ['pincheck-scan', 'skill/scan/SKILL.md'], ['pincheck-improve', 'skill/improve/SKILL.md']];
+  let crcT = null;
+  function crc32(b) {
+    if (!crcT) { crcT = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; crcT[n] = c >>> 0; } }
+    let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = crcT[(c ^ b[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  function zip(files) { // [[path, Uint8Array]] → Blob
+    const enc = new TextEncoder(), parts = [], dir = [];
+    let off = 0;
+    const d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    for (const [name, data] of files) {
+      const n = enc.encode(name), crc = crc32(data);
+      const h = new DataView(new ArrayBuffer(30));
+      [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, time, 2], [12, date, 2], [14, crc, 4], [18, data.length, 4], [22, data.length, 4], [26, n.length, 2], [28, 0, 2]].forEach(([o, v, s]) => s === 4 ? h.setUint32(o, v, true) : h.setUint16(o, v, true));
+      const c = new DataView(new ArrayBuffer(46));
+      [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, time, 2], [14, date, 2], [16, crc, 4], [20, data.length, 4], [24, data.length, 4], [28, n.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, off, 4]].forEach(([o, v, s]) => s === 4 ? c.setUint32(o, v, true) : c.setUint16(o, v, true));
+      parts.push(h, n, data); dir.push(c, n);
+      off += 30 + n.length + data.length;
+    }
+    const size = dir.reduce((s, x) => s + x.byteLength, 0);
+    const e = new DataView(new ArrayBuffer(22));
+    [[0, 0x06054b50, 4], [8, files.length, 2], [10, files.length, 2], [12, size, 4], [16, off, 4]].forEach(([o, v, s]) => s === 4 ? e.setUint32(o, v, true) : e.setUint16(o, v, true));
+    return new Blob(parts.concat(dir, [e]), { type: 'application/zip' });
+  }
+  async function skillsZip() {
+    const files = [];
+    for (const [name, src] of SKILLS) {
+      const r = await fetch(src, { cache: 'no-cache' });
+      if (!r.ok) throw new Error('Couldn\'t read ' + src);
+      files.push(['.claude/skills/' + name + '/SKILL.md', new Uint8Array(await r.arrayBuffer())]);
+    }
+    return zip(files);
+  }
+  async function downloadSkills() {
+    const b = await skillsZip();
+    const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = 'pincheck-skills.zip'; l.click(); setTimeout(() => URL.revokeObjectURL(l.href), 1500);
+  }
+  const SKILLS_STEP = 'The Claude skills, if Claude Code on this computer doesn\'t have them yet: <button class="btn btn-sm" data-skills>Download the skills</button> ' +
+    '<span class="pk-sub">Unzip pincheck-skills.zip in the folder you start Claude Code in (the Dovetail tools folder); it adds .claude/skills/pincheck-part, pincheck-scan, and pincheck-improve. They use the Pincheck repo checked out in that folder.</span>';
+
+  PK.claude = { SKILLS, crc32, zip, skillsZip, downloadSkills, SKILLS_STEP, load, get, fromFile, answers, unsaved, answer, acceptAll, save, partFiles, section, inspector, item, findingLike, sheet, prompt, TYPES };
 })(typeof window !== 'undefined' ? (window.PK = window.PK || {}) : (globalThis.PK = globalThis.PK || {}));

@@ -36,6 +36,18 @@ const eq = (a, b) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Er
     const e = S.validateScan(bad, offline, design).errs.join('\n');
     if (!/names the offline check/.test(e) || !/needs/.test(e)) throw new Error(e);
   });
+  await t('the skills zip unzips to .claude/skills with each SKILL.md intact', async () => {
+    globalThis.window = undefined; require(path.join(root, 'assets', 'claude.js'));
+    const C = globalThis.PK.claude;
+    const files = C.SKILLS.map(([name, src]) => ['.claude/skills/' + name + '/SKILL.md', new Uint8Array(fs.readFileSync(path.join(root, src)))]);
+    const tmp = path.join(require('os').tmpdir(), 'pk-skills-' + process.pid);
+    fs.mkdirSync(tmp, { recursive: true });
+    const z = path.join(tmp, 'skills.zip');
+    fs.writeFileSync(z, Buffer.from(await C.zip(files).arrayBuffer()));
+    require('child_process').execFileSync(process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:/Windows', 'System32', 'tar.exe') : 'unzip', process.platform === 'win32' ? ['-xf', 'skills.zip'] : ['-q', 'skills.zip'], { cwd: tmp });
+    for (const [name, src] of C.SKILLS) eq(fs.readFileSync(path.join(tmp, '.claude', 'skills', name, 'SKILL.md'), 'utf8'), fs.readFileSync(path.join(root, src), 'utf8'));
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
   console.log((fail ? 'FAIL' : 'PASS') + ': ' + pass + ' passed, ' + fail + ' failed');
   process.exit(fail ? 1 : 0);
 })();
