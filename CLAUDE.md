@@ -29,7 +29,7 @@ the suite's hard rules.
   `docs/design.md`, *The schematic viewer*. The demo is now Altium sheets and a Protel2 netlist made by
   `tools/make_demo_altium.py` (with `tools/schdoc_write.py`), beside the KiCad netlist.
 - **Scan panel (2026-11-13, Chris: Fabcheck's stage for schematics, the gallery chosen from three in
-  `lab/scan-panel.html`; built, not committed):** `assets/scan.js` leads a design's Overview when it has sheet
+  `lab/scan-panel.html`; pushed `bb090a4`):** `assets/scan.js` leads a design's Overview when it has sheet
   drawings. Every sheet is a thumbnail, all running at once during an 8 s replay of the run. Findings land
   as marks, and the finished bar is a slider to replay one check. The start page's empty panel is the drop
   target. See `docs/design.md`, *The scan panel*.
