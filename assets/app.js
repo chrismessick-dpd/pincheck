@@ -63,6 +63,13 @@
   // ── Opening designs ──
   async function openFiles(files) {
     files = [...files];
+    // A project as a .zip or a folder: only the sheets, netlists, .PrjPcb, and part files come out (assets/archive.js).
+    if (PK.archive && files.some(f => /\.zip$/i.test(f.name) || f.webkitRelativePath)) {
+      state.busy = 'Opening ' + (files.length === 1 ? files[0].name : files.length + ' files'); state.view = 'design'; renderAll();
+      try { files = await PK.archive.expand(files); } catch (e) { toast(e.message, 'error'); files = []; }
+      state.busy = null;
+      if (!files.length) { toast('No schematic sheets or netlist in what was dropped', 'error'); state.view = active() ? 'design' : 'home'; renderAll(); return; }
+    }
     const json = files.filter(f => /\.json$/i.test(f.name));
     const sch = files.filter(f => !/\.json$/i.test(f.name));
     for (const f of json) await importJson(await f.text(), f.name);
@@ -181,7 +188,7 @@
       const g = D.groups(d, ['ic', 'crystal']);
       const miss = g.filter(x => !L.find(state.lib, x.mpn)).length;
       return '<button class="proj' + (d.id === state.active && state.view === 'design' ? ' active' : '') + '" data-design="' + d.id + '"><span class="pk-ico">' + ICON.chip + '</span><span class="proj-body"><span class="proj-name">' + esc(d.name) + '</span><span class="proj-sub">' + d.parts.length + ' parts · ' + (miss ? miss + ' not in library' : 'all ICs in library') + '</span></span></button>';
-    }).join('') : '<div class="side-empty">Drop schematic sheets or a netlist to start.</div>';
+    }).join('') : '<div class="side-empty">Drop an Altium project (its folder or .zip), its sheets, or a netlist to start.</div>';
     $('#library-count').textContent = state.lib.length ? state.lib.length : '';
     $('#library-link').classList.toggle('active', state.view === 'library');
   }
@@ -234,7 +241,7 @@
   function homePage() {
     return '<div class="page"><div class="eyebrow">Prototype</div><h1 class="page-title">Pincheck</h1>' +
       '<p class="pk-lede">Checks a schematic against what each part allows: supply ranges, I/O levels, pin functions, and more. It starts by finding the ICs and looking each one up in the part library. Parts it doesn\'t know yet get a part file, which you fill in by hand or with Claude from the datasheet.</p>' +
-      (PK.scan ? PK.scan.emptyHtml('Altium: every .SchDoc of the project, with its Protel2 netlist (Design › Netlist For Project › Protel2) for the nets. KiCad: the XML netlist. Drop them anywhere on this window, or click here to choose. Read in this tab and never uploaded.')
+      (PK.scan ? PK.scan.emptyHtml('Altium: the project folder or its .zip, or every .SchDoc with its Protel2 netlist (Design › Netlist For Project › Protel2) for the nets. KiCad: the XML netlist. Drop them anywhere on this window. Read in this tab and never uploaded.')
         : '<button class="card pk-drop" data-act="open"><span class="pk-drop-ico">' + ICON.drop + '</span><b>Drop schematic sheets or a netlist</b><span class="pk-muted">Altium: every .SchDoc of the project, with its Protel2 netlist (Design › Netlist For Project › Protel2) for the nets. KiCad: the XML netlist. Read in this tab and never uploaded.</span></button>') +
       (DEMO ? '' : '<div class="pk-demo-row"><a class="btn" href="?demo">Try the demo</a><span class="pk-muted">The made-up Smart Thermostat\'s Main PCBA, with a small library.</span></div>') +
       '<div class="grid grid-3" style="margin-top:22px">' +
@@ -333,6 +340,7 @@
     if (a === 'nav') toggleSidebar();
     else if (a === 'home') { state.view = 'home'; renderAll(); }
     else if (a === 'open') { const i = $('#file-input'); i.value = ''; i.click(); }
+    else if (a === 'open-dir') { const i = $('#dir-input'); i.value = ''; i.click(); }
     else if (a === 'library') { state.view = 'library'; $('#app').classList.remove('nav-open'); renderAll(); }
     else if (a === 'theme') { const t2 = isDark(readTheme()) ? 'light' : 'dark'; writeTheme(t2); applyTheme(t2); }
     else if (a === 'sync') syncNow();
@@ -346,11 +354,21 @@
     if (e.target.dataset.id === 'fq') { state.q = e.target.value; const pos = e.target.selectionStart; renderView(); const n = $('[data-id="fq"]'); if (n) { n.focus(); n.setSelectionRange(pos, pos); } return; }
     if (e.target.dataset.id === 'lib-q') { state.libQuery = e.target.value; const pos = e.target.selectionStart; renderView(); const n = $('[data-id="lib-q"]'); n.focus(); n.setSelectionRange(pos, pos); } });
   $('#file-input').addEventListener('change', e => openFiles(e.target.files));
+  $('#dir-input').addEventListener('change', e => openFiles(e.target.files));
   let dragDepth = 0;
   window.addEventListener('dragenter', e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { dragDepth++; document.body.classList.add('pk-dragging'); } });
   window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('pk-dragging'); } });
   window.addEventListener('dragover', e => e.preventDefault());
-  window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('pk-dragging'); if (e.dataTransfer.files.length && !document.querySelector('.sheet-wrap')) openFiles(e.dataTransfer.files); });
+  // A dropped folder is walked (its entries are only readable during the event, so they're captured first).
+  window.addEventListener('drop', e => {
+    e.preventDefault(); dragDepth = 0; document.body.classList.remove('pk-dragging');
+    if (!e.dataTransfer.files.length || document.querySelector('.sheet-wrap')) return;
+    if (!PK.archive) { openFiles(e.dataTransfer.files); return; }
+    const drop = PK.archive.captureDrop(e.dataTransfer);
+    if (drop.entries.some(x => x.isDirectory)) { state.busy = 'Reading the folder'; state.view = 'design'; renderAll(); }
+    PK.archive.fromDrop(drop).then(files => { state.busy = null; return openFiles(files.map(f => { if (f.path && f.path.includes('/') && !f.webkitRelativePath) Object.defineProperty(f, 'webkitRelativePath', { value: f.path }); return f; })); })
+      .catch(err => { state.busy = null; toast(err.message, 'error'); state.view = active() ? 'design' : 'home'; renderAll(); });
+  });
 
   // ── The demo: the Smart Thermostat's Main PCBA as Altium sheets and as a KiCad netlist, and a small library ──
   async function loadDemo() {

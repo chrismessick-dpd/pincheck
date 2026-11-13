@@ -48,6 +48,12 @@ against what each part allows, offline, from a library of part files. Started 20
   with a pointer to Protel2. The EDIF export carries the same, but heavier.
 - Altium vault parts put the part number in Comment, not a parameter (seen in two real projects); the
   library reference can be a hash. `design.identify` handles both.
+- **A project folder or .zip** (2026-11-13, Chris): drop or choose an Altium project's folder or its .zip
+  (zips inside it too). `assets/archive.js` keeps only what Pincheck reads: .SchDoc, .NET or .xml, .PrjPcb (for
+  the design's name), and .json part files. PcbDoc files, drawings, libraries, `History/`, and `Project Logs`
+  and `Project Outputs` folders are skipped without being inflated. It reads zips with the browser's own
+  `DecompressionStream`, with no library (the page allows only its own scripts), and handles ZIP64. Tried on
+  a real 58 MB project zip: 20 of its 30 files read, 18 sheets, 1,031 parts, and 701 nets, in about 0.3 s.
 
 ## The parameter catalog
 
@@ -176,6 +182,5 @@ section of `assets/styles.css` build it.
 ## Not built yet
 
 - Nets derived from SchDoc files without a netlist (not planned while Protel2 works).
-- A zip or folder drop (the project zip Chris sent; JSZip, as Partcheck loads it).
 - Microchip and IBIS importers; passive part-number decoding.
 - Sharing findings with Signoff EE, the way Fabcheck sends a run.

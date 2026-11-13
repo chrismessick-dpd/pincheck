@@ -426,16 +426,12 @@
 
   // The start page's panel, empty: a drop target, as Fabcheck's start page is.
   function emptyHtml(note) {
-    return '<section class="card sp-panel sp-empty" data-act="open" role="button" tabindex="0" aria-label="Choose schematic files">' +
+    return '<section class="card sp-panel sp-empty" data-act="open">' +
       '<div class="sp-prog"><div class="sp-bar"></div><div class="sp-meta"><span class="sp-muted">Ready</span><span></span></div></div>' +
       '<div class="sp-galwrap"><div class="sp-grid sp-ghosts">' + [1, 2, 3].map(() => '<figure class="sp-card"><div class="sp-card-art"><div class="sp-ghost"></div></div><figcaption><span class="sp-card-name sp-muted">Sheet</span></figcaption></figure>').join('') + '</div>' +
-      '<div class="sp-cap"><div class="sp-eyebrow">Drop to check</div><div class="sp-title">Drop schematic sheets or a netlist</div><div class="sp-desc">' + note + '</div></div></div></section>';
+      '<div class="sp-cap"><div class="sp-eyebrow">Drop to check</div><div class="sp-title">Drop an Altium project, its sheets, or a netlist</div><div class="sp-desc">' + note + '</div>' +
+      '<div class="sp-actions"><button class="btn btn-primary" data-act="open">Choose files…</button><button class="btn" data-act="open-dir">Choose folder…</button></div></div></div></section>';
   }
-
-  // The empty panel is a button: Enter or Space opens the file picker, as a click does.
-  document.addEventListener('keydown', e => {
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('sp-empty')) { e.preventDefault(); e.target.click(); }
-  });
 
   PK.scan = { attach, running, emptyHtml, geometry, plan, stateAt, pickAt, TOTAL };
 })(window.PK = window.PK || {});

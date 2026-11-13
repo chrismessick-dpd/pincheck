@@ -331,6 +331,39 @@
     eq(wrap.children.length, 0);
   });
 
+  // A zip made here: some entries deflated (CompressionStream), some stored, one zip inside another.
+  async function makeZip(list) {
+    const enc = new TextEncoder(), parts = [], dir = [];
+    let off = 0;
+    const le = (n, w) => { const b = new Uint8Array(w); for (let i = 0; i < w; i++) b[i] = (n / 2 ** (8 * i)) & 255; return b; };
+    const crc = d => { let c, t = crc.t || (crc.t = Array.from({ length: 256 }, (_, n) => { c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; })); c = 0xFFFFFFFF; for (const x of d) c = t[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+    for (const [name, data, deflate] of list) {
+      const raw = typeof data === 'string' ? enc.encode(data) : data, nm = enc.encode(name);
+      const body = deflate ? new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'))).arrayBuffer()) : raw;
+      const head = [le(0x04034b50, 4), le(20, 2), le(0, 2), le(deflate ? 8 : 0, 2), le(0, 4), le(crc(raw), 4), le(body.length, 4), le(raw.length, 4), le(nm.length, 2), le(0, 2), nm];
+      dir.push([le(0x02014b50, 4), le(20, 2), le(20, 2), le(0, 2), le(deflate ? 8 : 0, 2), le(0, 4), le(crc(raw), 4), le(body.length, 4), le(raw.length, 4), le(nm.length, 2), le(0, 2), le(0, 2), le(0, 2), le(0, 2), le(0, 4), le(off, 4), nm]);
+      for (const h of head) { parts.push(h); off += h.length; }
+      parts.push(body); off += body.length;
+    }
+    const cd = dir.flat(), cdLen = cd.reduce((a, b) => a + b.length, 0);
+    return new Blob([...parts, ...cd, le(0x06054b50, 4), le(0, 4), le(list.length, 2), le(list.length, 2), le(cdLen, 4), le(off, 4), le(0, 2)]);
+  }
+  t('zip: only the files Pincheck reads come out, from zips inside zips too', async () => {
+    const inner = await makeZip([['Inner.SchDoc', 'inner sheet', true]]);
+    const z = await makeZip([['Proj/A.SchDoc', 'sheet a'.repeat(50), true], ['Proj/Proj.PrjPcb', '[Design]', false], ['Proj/Proj.NET', 'PROTEL NETLIST 2.0', true],
+      ['Proj/Board.PcbDoc', 'big board', true], ['Proj/History/Old.SchDoc', 'old', false], ['__MACOSX/Proj/._A.SchDoc', 'x', false], ['Proj/more.zip', new Uint8Array(await inner.arrayBuffer()), false]]);
+    const out = await PK.archive.expand([new File([z], 'Proj.zip')]);
+    eq(out.map(f => f.path), ['Proj/A.SchDoc', 'Proj/Proj.PrjPcb', 'Proj/Proj.NET', 'Proj/more.zip/Inner.SchDoc']);
+    eq(await out[0].text(), 'sheet a'.repeat(50)); eq(await out[3].text(), 'inner sheet');
+    eq(out.map(f => f.name), ['A.SchDoc', 'Proj.PrjPcb', 'Proj.NET', 'Inner.SchDoc']);
+  });
+  t('zip: the Altium demo zipped opens as the same design', async () => {
+    const names = await (await fetch('../demo/altium/index.json', { cache: 'no-store' })).json();
+    const list = await Promise.all(names.map(async n => ['Main PCBA/' + n, new Uint8Array(await (await fetch('../demo/altium/' + encodeURIComponent(n), { cache: 'no-store' })).arrayBuffer()), true]));
+    const d = await D.build(await PK.archive.expand([new File([await makeZip(list)], 'Main PCBA.zip')]));
+    eq([d.parts.length, d.nets.length, d.drawings.length], [alt.parts.length, alt.nets.length, alt.drawings.length]);
+  });
+
   for (const [name, fn] of tests) {
     try { await fn(); out.push('✓ ' + name); } catch (e) { fails.push(name); out.push('✕ ' + name + '\n    ' + e.message); }
   }
