@@ -109,7 +109,9 @@ only if Chris asks, and only from the manufacturer's own site.
    - `num`, `name` (keep the schematic's name if the file came with pins; if they differ beyond
      formatting, keep both by putting the datasheet's in `note` and report it);
    - `role` (from `part.js kinds`): power-in, power-out, ground, io, input, output, open-drain, analog,
-     clock-in, clock-out, reset, boot, enable, feedback, switch, bootstrap, power-good, bus (CAN, RS-485, RS-232, or USB data lines, which take the bus limits, not the domain's logic levels), nc, dnc, pad, other;
+     clock-in, clock-out, reset, boot, enable, feedback, switch, bootstrap, power-good, bus (CAN, RS-485, RS-232, or USB data lines, which take the bus limits, not the domain's logic levels), nc, dnc, pad, other.
+     A switching regulator's inductor pin (SW, LX, VLXSMPS, PH), on its own or inside an MCU, is `switch`, never
+     `power-out`: the checks flag a switch node tied to a rail;
    - `domain`: which supply powers this I/O pin, or which domain a power pin belongs to;
    - `ft: true` only where the datasheet marks the pin 5 V tolerant (FT, TT…); never by guess;
    - `functions`: alternate functions, interface roles (`I2C SDA`, `UART TX`), EXTI, ADC channels;

@@ -141,3 +141,7 @@ body.pk-dragging .pk-dropzone { display: grid; }
 .pk-basis ul { margin: 0; padding-left: 18px; }
 .pk-rails td { padding: 7px 14px; }
 @media (max-width: 860px) { .pk-fchips, .pk-fbody { margin-left: 0; } }
+.pk-tag-waived { font: 600 10.5px var(--sans); padding: 1px 6px; border-radius: 5px; background: var(--bg-sunk); color: var(--text-3); }
+.pk-wnote { font-size: 12.5px; padding: 6px 10px; border-left: 3px solid var(--hair-2); background: var(--bg-elev); }
+.pk-waived > summary { cursor: pointer; list-style: revert; }
+.pk-waived .pk-frow { opacity: 0.8; }

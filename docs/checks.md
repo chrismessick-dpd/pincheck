@@ -58,3 +58,11 @@ Signal nets get a **high level** from pull-up resistors to a known rail and from
 
 `PK.checks.CATALOG` lists every check: key, group, title, and what it needs. The Findings filter comes
 from it. There is no check matrix in Pincheck (Chris, 2026-11-13).
+
+## Waivers
+
+A finding can be waived, with a reason (Chris, 2026-11-13: a variant choice where only one of two parts is fitted,
+an open pin that's fine on this board). One finding, or every finding like it: the same check and title once
+channel suffixes are dropped (`U5.1` on `BUS_RX.1` is like `U5.2` on `BUS_RX.2`). Waivers are kept in the
+browser per design name, as Fabcheck's are; waived findings leave the counts and show under Waived, where they
+can be restored. Severities don't change for being waivable: an open VBAT is an error you waive if it's fine.

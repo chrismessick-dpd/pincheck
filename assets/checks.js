@@ -10,6 +10,7 @@
     { key: 'supply.absmax', group: 'Supply', title: 'Supply pins below their absolute maximum', needs: 'supply.absmax, supply.absmin' },
     { key: 'supply.unpowered', group: 'Supply', title: 'Supply pins with a source', needs: 'pin roles' },
     { key: 'supply.ground', group: 'Supply', title: 'Ground pins and pads on ground', needs: 'pin roles' },
+    { key: 'supply.switchnode', group: 'Supply', title: 'Switch nodes off supply rails', needs: 'pin roles (switch)' },
     { key: 'supply.tied', group: 'Supply', title: 'Domains that must share a rail', needs: 'supply.tied' },
     { key: 'supply.rails', group: 'Supply', title: 'Rails driven from two places', needs: 'regulator outputs' },
     { key: 'io.absmax', group: 'I/O levels', title: 'Pins below their absolute maximum', needs: 'io.absmax, io.ft.absmax, pin absmax' },
@@ -344,9 +345,27 @@
         // Supply pins.
         if (pin.role === 'power-in') {
           tick('supply.unpowered');
-          const driven = nodes.some(n => { const fp = M.filePin(n.ref, n.pin); const q = M.parts.get(n.ref); return (fp && fp.role === 'power-out') || (q && (q.kind === 'connector' || q.kind === 'inductor' || q.kind === 'resistor' || /^(FB|F|D)\d/i.test(q.ref))) || (q && !M.files.get(q.ref) && q.kind === 'ic' && n.ref !== ref); });
-          if (alone) add('supply.unpowered', 'error', label + ' is not connected', 'A supply pin on no net, or alone on its net.', where);
-          else if (!nv && !driven) add('supply.unpowered', 'error', label + ' has no supply', 'Its net ' + net + ' has no regulator output, connector, or series part on it, and its name states no voltage. Only ' + nodes.map(n => n.ref).filter((x, i, a) => a.indexOf(x) === i).slice(0, 6).join(', ') + ' are on it.', where);
+          // On a rail: the net (or one reached through inductors, ferrite beads, fuses, and 0 Ω links) has
+          // another part's power output, a connector, a diode, or an IC with no part file (which may be a
+          // regulator). An inductor or capacitor alone doesn't feed a supply pin (Chris, 2026-11-13).
+          // The part's own supply output counts once reached through a series part (an isolated converter's output through a
+          // bead to its own isolated input), but never its core-regulator capacitor pins (VCAP, VDD11, VDDCORE).
+          const CORE = /^(VCAP|VDD11|V11|VDDCORE|VCORE|VDDLDO|VDD_?CORE)/i;
+          const sourceOn = (n, depth) => { const fp = M.filePin(n.ref, n.pin); const q = M.parts.get(n.ref); if (!q) return false; if (n.ref === ref && (depth === 0 || !fp || CORE.test(fp.name))) return false; return (fp && fp.role === 'power-out' && !(n.ref === ref && CORE.test(fp.name))) || (n.ref !== ref && (q.kind === 'connector' || /^(D|PS|BT)\d/i.test(q.ref) || (!M.files.get(q.ref) && (q.kind === 'ic' || q.kind === 'other')))); };
+          const passOn = (q, from) => { if (!q || q.pins.length !== 2) return null; const lowR = q.kind === 'resistor' && ((passiveValue(q, 'Ω') || {}).v ?? 99) <= 1; if (!(q.kind === 'inductor' || lowR || /^(FB|F)\d/i.test(q.ref))) return null; const e = twoPin(M, q); return e && (e[0] === from ? e[1] : e[0]); };
+          let driven = false;
+          for (let frontier = net ? [net] : [], seenN = new Set(frontier), d = 0; frontier.length && d < 4 && !driven; d++) {
+            const next = [];
+            for (const nn of frontier) for (const n of M.nets.get(nn) || []) {
+              if (sourceOn(n, d)) { driven = true; break; }
+              const other = passOn(M.parts.get(n.ref), nn);
+              if (other && !seenN.has(other)) { if (NV.V.has(other) && NV.V.get(other).v > 0) { driven = true; break; } seenN.add(other); next.push(other); }
+            }
+            frontier = next;
+          }
+          const backup = /^(VBAT|VBACKUP|VBKP|VBAK|VRTC)/i.test(pin.domain || pin.name);
+          if (alone) add('supply.unpowered', 'error', label + ' is not connected' + (backup ? ' (backup supply)' : ''), backup ? 'A backup supply pin left open. Many parts need it tied to the main supply when no battery is fitted; check the datasheet\'s power section.' : 'A supply pin on no net, or alone on its net.', where);
+          else if (!nv && !driven) add('supply.unpowered', 'error', label + ' is not on a supply rail', 'Its net ' + net + ' has no known voltage and nothing that supplies one: no regulator output, connector, or rail reached through an inductor or ferrite bead. On it: ' + nodes.filter(n => n.ref !== ref).map(n => n.ref + ' ' + ((M.filePin(n.ref, n.pin) || (M.parts.get(n.ref) || { pins: [] }).pins.find(x => x.num === n.pin) || {}).name || n.pin)).slice(0, 8).join(', ') + '. Check it isn\'t swapped with a neighboring pin.', where);
           if (nv && pin.domain) {
             const range = val('supply.range', pin.domain), absmax = val('supply.absmax', pin.domain), absmin = val('supply.absmin', pin.domain);
             const lim = v => evalExpr(v, doms);
@@ -370,11 +389,18 @@
           else if (net && pin.role === 'ground' && !NV.ground.has(net)) add('supply.ground', 'error', label + ' is on ' + net + ', not ground', 'A ground pin on a net that isn\'t ground' + (nv ? ' (' + fmtV(nv.v) + ')' : '') + '.', where);
         }
 
+        if (pin.role === 'switch' && net) {
+          tick('supply.switchnode');
+          const others = nodes.filter(n => n.ref !== ref);
+          const supplies = others.filter(n => { const fp = M.filePin(n.ref, n.pin); return fp && fp.role === 'power-in'; });
+          if (NV.ground.has(net) || (nv && nv.v > 0) || supplies.length >= 2) add('supply.switchnode', 'error', label + ', a switch node, is on ' + (NV.ground.has(net) ? 'ground' : 'the rail ' + net), 'A switching regulator\'s switch pin drives an inductor; it must not be tied to ' + (NV.ground.has(net) ? 'ground' : 'a supply rail' + (nv ? ' (' + fmtV(nv.v) + ', ' + nv.from + ')' : '') + (supplies.length ? ', which feeds ' + [...new Set(supplies.map(n => n.ref))].slice(0, 5).join(', ') : '')) + '. Check it isn\'t swapped with the supply input pin.', where);
+        }
+
         // Pins.
         if (pin.role === 'dnc') { tick('pins.dnc'); if (!alone) add('pins.dnc', 'error', label + ' is do-not-connect but is on ' + net, 'The datasheet says to leave this pin open.', where); }
         if (pin.unused === 'must' || pin.unused === 'gnd' || pin.unused === 'supply') {
           tick('pins.unused');
-          if (alone) add('pins.unused', pin.unused === 'must' ? 'error' : 'warn', label + ' is left open', 'The part file says ' + ({ must: 'it must be driven or tied', gnd: 'to tie it to ground when unused', supply: 'to tie it to its supply when unused' })[pin.unused] + '.', where);
+          if (alone) add('pins.unused', 'error', label + ' is left open', 'The part file says ' + ({ must: 'it must be driven or tied', gnd: 'to tie it to ground when unused', supply: 'to tie it to its supply when unused' })[pin.unused] + '.', where);
         }
         if (['reset', 'boot', 'enable'].includes(pin.role)) {
           tick('pins.float');
@@ -452,8 +478,17 @@
       }
       for (const pin of f.pins) {
         if (!pin.ext) continue;
-        const m = /(\d+(?:\.\d+)?)\s*([pnuµm]?)F\b/i.exec(pin.ext.replace(/(\d)([pnuµ])(\d)/g, '$1.$3$2'));
+        const ext = pin.ext.replace(/(\d)([pnuµ])(\d)/g, '$1.$3$2');
         const net = M.netOf.get(ref + '.' + pin.num);
+        const mh = /(\d+(?:\.\d+)?)\s*([pnuµm]?)H\b/.exec(ext);
+        if (mh && net && !(pin.role === 'switch' && (NV.V.has(net) || NV.ground.has(net)))) {
+          tick('parts.ext');
+          const wantL = parseFloat(mh[1]) * ({ p: 1e-12, n: 1e-9, u: 1e-6, 'µ': 1e-6, m: 1e-3, '': 1 })[mh[2]];
+          const inds = (M.nets.get(net) || []).map(n => M.parts.get(n.ref)).filter(q => q && q.kind === 'inductor').map(q => ({ ref: q.ref, v: (passiveValue(q, 'H') || {}).v }));
+          if (!inds.length) add('parts.ext', 'error', ref + ' ' + pin.name + ' needs a ' + P.fmt(wantL, 'H') + ' inductor; none is on ' + net, 'The part file says: ' + pin.ext + '. Nothing on ' + net + ' is an inductor' + (pin.role === 'switch' ? ', so this switch pin drives nothing (check it isn\'t swapped with the supply input)' : '') + '.', { refs: [ref], pins: [ref + '.' + pin.num], nets: [net], basis: [{ file: f.id, mpn: f.mpn, k: 'pin ' + pin.num + ' ext', on: '', page: null, verified: false }] });
+          else if (inds.every(x => x.v != null && Math.abs(x.v - wantL) > 0.5 * wantL)) add('parts.ext', 'warn', ref + ' ' + pin.name + ' wants ' + P.fmt(wantL, 'H') + '; ' + inds.map(x => x.ref + ' is ' + P.fmt(x.v, 'H')).join(', '), 'The part file says: ' + pin.ext + '.', { refs: [ref].concat(inds.map(x => x.ref)), pins: [ref + '.' + pin.num], nets: [net], basis: [{ file: f.id, mpn: f.mpn, k: 'pin ' + pin.num + ' ext', on: '', page: null, verified: false }] });
+        }
+        const m = /(\d+(?:\.\d+)?)\s*([pnuµm]?)F\b/i.exec(ext);
         if (!m || !net) continue;
         tick('parts.ext');
         const want = parseFloat(m[1]) * ({ p: 1e-12, n: 1e-9, u: 1e-6, 'µ': 1e-6, m: 1e-3, '': 1 })[m[2].toLowerCase()];

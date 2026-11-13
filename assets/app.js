@@ -103,7 +103,43 @@
     if (d.run && d.runGen === state.libGen) return d.run;
     try { d.run = PK.checks.run(d, state.lib); } catch (e) { console.error(e); toast('The checks stopped: ' + e.message, 'error'); d.run = { findings: [], rails: [], coverage: {}, parts: {}, ms: 0, hasNets: false }; }
     d.runGen = state.libGen;
+    applyWaivers(d);
     return d.run;
+  }
+
+  // ── Waivers (as Fabcheck's): a reason is required; one finding, or every finding like it, which
+  // folds channel copies together (U5.1 on BUS_RX.1 is like U5.2 on BUS_RX.2). Kept in this browser
+  // per design name. Waived findings leave the counts and show in Findings' Waived section.
+  const WAIVE_KEY = d => (DEMO ? 'pincheck.demo.' : 'pincheck.v1.') + 'waivers.' + d.name;
+  const similarKey = f => f.check + '|' + f.title.replace(/([A-Za-z_+][\w+]*?)\.\d+\b/g, '$1');
+  function loadWaivers(d) { try { return JSON.parse(localStorage.getItem(WAIVE_KEY(d)) || '[]'); } catch (e) { return []; } }
+  function saveWaivers(d, list) { try { localStorage.setItem(WAIVE_KEY(d), JSON.stringify(list)); } catch (e) { toast('Couldn\'t save the waiver in this browser', 'error'); } }
+  function applyWaivers(d) {
+    const list = loadWaivers(d);
+    for (const f of d.run.findings) f.waived = list.find(w => (w.scope === 'one' ? w.key === f.id : w.key === similarKey(f))) || null;
+  }
+  function waiveSheet(d, f) {
+    const like = d.run.findings.filter(x => !x.waived && similarKey(x) === similarKey(f));
+    const w = document.createElement('div');
+    w.className = 'sheet-wrap';
+    w.innerHTML = '<div class="sheet"><div class="sheet-head"><h2>Waive this finding</h2><p>' + esc(f.title) + '</p></div><div class="sheet-body">' +
+      '<div class="field"><label>Why it\'s fine (required)</label><textarea class="input" rows="3" data-w="reason" placeholder="e.g. Variant choice: only one of U21 and U25 is fitted."></textarea></div>' +
+      (like.length > 1 ? '<div class="field"><label><input type="radio" name="pk-wscope" value="one" checked> This finding only</label><br><label><input type="radio" name="pk-wscope" value="similar"> All ' + like.length + ' like it (' + esc(like.slice(0, 4).map(x => x.refs[0] || x.nets[0]).join(', ')) + (like.length > 4 ? ', …' : '') + ')</label></div>' : '') +
+      '<p class="pk-muted">Kept in this browser for ' + esc(d.name) + '. A waived finding leaves the counts and stays listed under Waived, where it can be restored.</p></div>' +
+      '<div class="sheet-foot"><button class="btn" data-w="cancel">Cancel</button><button class="btn btn-primary" data-w="save">Waive</button></div></div>';
+    document.body.appendChild(w);
+    w.querySelector('textarea').focus();
+    w.addEventListener('click', e => {
+      const a = e.target.dataset && e.target.dataset.w;
+      if (e.target === w || a === 'cancel') { w.remove(); return; }
+      if (a !== 'save') return;
+      const reason = w.querySelector('textarea').value.trim();
+      if (!reason) { w.querySelector('textarea').focus(); toast('Say why it\'s fine', 'error'); return; }
+      const scope = (w.querySelector('input[name="pk-wscope"]:checked') || { value: 'one' }).value;
+      const list = loadWaivers(d).concat([{ key: scope === 'one' ? f.id : similarKey(f), scope, reason, by: who(), at: new Date().toISOString(), title: f.title, check: f.check }]);
+      saveWaivers(d, list); applyWaivers(d); w.remove(); state.openFinding = null; renderTabs(); renderView();
+      toast(scope === 'one' ? 'Waived' : 'Waived ' + like.length + ' findings');
+    });
   }
 
   // ── The library's sync with pincheck_data ──
@@ -131,7 +167,7 @@
   function renderTabs() {
     const seg = $('#view-seg'), d = active();
     if (state.view !== 'design' || !d || state.busy) { seg.hidden = true; return; }
-    const run = ensureRun(d), c = PK.pages.counts(run.findings);
+    const run = ensureRun(d), c = PK.pages.counts(run.findings.filter(f => !f.waived));
     const tabs = [['overview', 'Overview', ''], ['findings', 'Findings', c.error || c.warn ? '<span class="count">' + (c.error ? '✕ ' + c.error + ' ' : '') + (c.warn ? '▲ ' + c.warn : '') + '</span>' : ''], ['parts', 'Parts', '']];
     if (PK.viewer && d.sheetsDrawn) tabs.splice(2, 0, ['schematic', 'Schematic', '']);
     seg.hidden = false;
@@ -257,7 +293,7 @@
 
   // ── Events ──
   document.addEventListener('click', async e => {
-    const t = e.target.closest('[data-act],[data-design],[data-config],[data-filter],[data-edit],[data-alias],[data-tab],[data-sev],[data-sevonly],[data-fopen],[data-openfile],[data-show]');
+    const t = e.target.closest('[data-act],[data-design],[data-config],[data-filter],[data-edit],[data-alias],[data-tab],[data-sev],[data-sevonly],[data-fopen],[data-openfile],[data-show],[data-waive],[data-unwaive]');
     if (!t) return;
     if (t.dataset.design) { state.active = t.dataset.design; state.view = 'design'; $('#app').classList.remove('nav-open'); renderAll(); return; }
     if (t.dataset.config) { configure(t.dataset.config); return; }
@@ -267,6 +303,8 @@
     if (t.dataset.sevonly) { state.sev = { error: false, warn: false, info: false, [t.dataset.sevonly]: true }; state.tab = 'findings'; renderTabs(); renderView(); return; }
     if (t.dataset.fopen) { state.openFinding = state.openFinding === t.dataset.fopen ? null : t.dataset.fopen; renderView(); return; }
     if (t.dataset.show && PK.viewer) { const d = active(); const f = d && d.run && d.run.findings.find(x => x.id === t.dataset.show); if (f) { state.tab = 'schematic'; state.showFinding = f; renderTabs(); renderView(); } return; }
+    if (t.dataset.waive) { const d = active(); const f = d && d.run.findings.find(x => x.id === t.dataset.waive); if (f) waiveSheet(d, f); return; }
+    if (t.dataset.unwaive) { const d = active(); const f = d && d.run.findings.find(x => x.id === t.dataset.unwaive); if (f && f.waived) { saveWaivers(d, loadWaivers(d).filter(w => !(w.key === f.waived.key && w.at === f.waived.at))); applyWaivers(d); renderTabs(); renderView(); toast('Restored'); } return; }
     if (t.dataset.openfile) { const f = state.lib.find(x => x.id === t.dataset.openfile); const d = active(); const part = d && t.dataset.ref ? d.parts.find(p => p.ref === t.dataset.ref) : null; if (f) editPart(f, part, false); return; }
     if (t.dataset.edit) { const f = state.lib.find(x => x.id === t.dataset.edit); if (f) editPart(f, null, false); return; }
     if (t.dataset.alias) {

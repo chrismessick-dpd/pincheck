@@ -167,11 +167,33 @@
     const has = (check, re, sev) => r.findings.some(f => f.check === check && re.test(f.title) && (!sev || f.severity === sev));
     ok(has('supply.ground', /U1 GND .* is on \+5V, not ground/, 'error'), 'reversed gate supply: GND on +5V');
     ok(has('supply.range', /U1 VCC .* at 0 V/, 'error'), 'reversed gate supply: VCC on ground');
-    ok(has('supply.unpowered', /U3 VBAT .* not connected/, 'error'), 'VBAT open');
+    ok(has('supply.unpowered', /U3 VBAT .* not connected/, 'error'), 'VBAT open is an error, waivable (Chris)');
     ok(has('io.absmax', /U3 PA0 .* sees 5 V, above its 3\.6 V/, 'error'), 'PA0 pulled to 5 V');
     ok(has('parts.regulator', /U2 output has 100 nF, below the 1 µF minimum/, 'warn'), 'output capacitor below the minimum');
     eq(+r.rails.find(x => x.net === 'NetU2_3').v.toFixed(2), 3.3, 'the LDO output net');
     ok(!r.findings.some(f => f.check === 'supply.range' && /U3 VDD/.test(f.title)), 'U3 VDD at 3.3 V is fine');
+  });
+  t('checks: an MCU with its SMPS input and switch pins swapped', () => {
+    const pin = (num, name, type) => ({ num, name, type });
+    const design2 = { sheets: [], notes: [], parts: [
+      { ref: 'U1', mpn: 'MCU2', kind: 'ic', params: {}, pins: [pin('1', 'VDD', 'power'), pin('2', 'VSS', 'power'), pin('3', 'VLXSMPS', 'power'), pin('4', 'VDDSMPS', 'power'), pin('5', 'VCAP', 'power'), pin('6', 'VBAT', 'power')] },
+      { ref: 'L1', mpn: '', kind: 'inductor', params: { Value: '2.2uH' }, pins: [pin('1', '1', 'passive'), pin('2', '2', 'passive')] },
+      { ref: 'C1', mpn: '', kind: 'capacitor', params: { Value: '220pF' }, pins: [pin('1', '1', 'passive'), pin('2', '2', 'passive')] },
+    ], nets: [
+      { name: '+3V3', nodes: [{ ref: 'U1', pin: '1' }, { ref: 'U1', pin: '3' }] },  // VLXSMPS on the rail: swapped
+      { name: 'GND', nodes: [{ ref: 'U1', pin: '2' }, { ref: 'C1', pin: '2' }] },
+      { name: 'NetC1_1', nodes: [{ ref: 'U1', pin: '4' }, { ref: 'C1', pin: '1' }, { ref: 'L1', pin: '1' }] }, // VDDSMPS between L1 and C1
+      { name: 'VCAP', nodes: [{ ref: 'L1', pin: '2' }, { ref: 'U1', pin: '5' }] },
+    ] };
+    const lib2 = [{ schema: 'pincheck.part/1', id: 'mcu2', mpn: 'MCU2', kind: 'mcu', match: [], datasheet: {}, domains: ['VDD', 'VDDSMPS', 'VBAT'], values: [], pins: [
+      { num: '1', name: 'VDD', role: 'power-in', domain: 'VDD' }, { num: '2', name: 'VSS', role: 'ground' }, { num: '3', name: 'VLXSMPS', role: 'switch', ext: '2.2 µH inductor to VCAP' },
+      { num: '4', name: 'VDDSMPS', role: 'power-in', domain: 'VDDSMPS', ext: '4.7 µF to GND' }, { num: '5', name: 'VCAP', role: 'power-out' }, { num: '6', name: 'VBAT', role: 'power-in', domain: 'VBAT' }] }];
+    const r = CK.run(design2, lib2);
+    const has = (check, re, sev) => r.findings.some(f => f.check === check && re.test(f.title) && f.severity === sev);
+    ok(has('supply.switchnode', /U1 VLXSMPS .*switch node, is on the rail \+3V3/, 'error'), 'VLXSMPS on a rail');
+    ok(has('supply.unpowered', /U1 VDDSMPS .* is not on a supply rail/, 'error'), 'VDDSMPS not on a rail (its own VCAP through L1 doesn\'t count)');
+    ok(has('supply.unpowered', /U1 VBAT .* not connected \(backup supply\)/, 'error'), 'VBAT open is an error');
+    ok(!r.findings.some(f => f.check === 'parts.ext' && /VLXSMPS wants/.test(f.title)), 'no inductor-value noise on a switch pin already on a rail');
   });
   t('checks: an unverified value turns an error into a warning that names it', () => {
     const lib2 = JSON.parse(JSON.stringify(mini.lib));

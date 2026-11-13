@@ -54,7 +54,7 @@
     if (/^(XOUT|X2|XO)\b|OSC_?OUT|OSC32_OUT/.test(n)) return 'clock-out';
     if (/^(EN|ENABLE|SHDN|N?SHDN|CE|ON|ON\/OFF)\b|_EN$/.test(n)) return 'enable';
     if (/^(FB|VFB|ADJ|VSENSE)\b/.test(n)) return 'feedback';
-    if (/^(SW|LX|PH|SW\d)\b/.test(n)) return 'switch';
+    if (/^(SW|LX|PH|SW\d|LX\d|VLX\w*)\b/.test(n)) return 'switch';
     if (/^(PG|PGOOD|POK|PWRGD|PGD)\b/.test(n)) return 'power-good';
     if (/^P[A-K]\d{1,2}\b/.test(n)) return 'io';
     return { input: 'input', output: 'output', io: 'io', power: 'power-in', 'power-out': 'power-out', 'open-collector': 'open-drain', 'open-emitter': 'output', hiz: 'output', nc: 'nc' }[pin.type] || 'other';
