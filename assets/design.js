@@ -102,6 +102,7 @@
           if (!p.libRef) p.libRef = s.libRef;
           p.designItemId = s.designItemId;
           p.schRef = s.ref;
+          p.sheets = s.sheets.slice(); // the SchDoc sheets it's drawn on, not the netlist's file name
         }
         const unmatched = fromNetlist.size - joined;
         if (unmatched) notes.push(unmatched + ' of the netlist\'s ' + fromNetlist.size + ' parts have no part on the sheets (by designator); their pins on no net aren\'t listed.');

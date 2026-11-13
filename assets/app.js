@@ -197,6 +197,8 @@
       state.sync.at = Date.now();
       if (r.conflicts) toast(r.conflicts + ' part file' + (r.conflicts === 1 ? ' was' : 's were') + ' changed here and in pincheck_data: the older copy is kept as “.conflict”');
       if (r.pulled || r.pushed) await reloadLib();
+      // Answers to Claude's scans kept in this browser go to their scans' decisions.json.
+      if (PK.claude) for (const d of state.designs) if (PK.claude.unsaved(d) && !(PK.claude.get(d) || {}).local) await PK.claude.save(d);
     } catch (e) {
       state.sync.error = e.status === 404 ? 'pincheck_data not found (or no access)' : e.message;
     }
@@ -486,14 +488,17 @@
   let inspShown = null;
   function syncInspector() {
     const el = $('#inspector'), d = active();
-    const f = state.view === 'design' && d && d.run && (state.tab === 'findings' || state.tab === 'overview') && state.openFinding
-      ? d.run.findings.find(x => x.id === state.openFinding) : null;
+    const on = state.view === 'design' && d && d.run && (state.tab === 'findings' || state.tab === 'overview') && state.openFinding;
+    // A Claude scan's item (assets/claude.js) opens its own panel, with Confirm and Not a problem.
+    const ck = on && PK.claude && /^claude:/.test(state.openFinding) ? PK.claude.item(d, state.openFinding) : null;
+    const f = ck ? PK.claude.findingLike(d, state.openFinding) : on ? d.run.findings.find(x => x.id === state.openFinding) : null;
     if (!f) { el.classList.remove('open'); inspShown = null; return; }
-    if (inspShown !== f || !el.classList.contains('open')) {
-      el.innerHTML = PK.pages.inspector(d, f, { hasSheets: !!d.sheetsDrawn });
+    const shownKey = ck ? state.openFinding + '|' + JSON.stringify(PK.claude.answers(d)[ck.id] || {}) : f;
+    if (inspShown !== shownKey || !el.classList.contains('open')) {
+      el.innerHTML = ck ? PK.claude.inspector(d, state.openFinding, { hasSheets: !!d.sheetsDrawn }) : PK.pages.inspector(d, f, { hasSheets: !!d.sheetsDrawn });
       el.classList.add('open');
       if (PK.viewer && !PK.viewer.preview(el.querySelector('.insp-prev-slot'), d, f)) { const b = el.querySelector('.insp-preview'); if (b) b.remove(); }
-      inspShown = f;
+      inspShown = shownKey;
     }
   }
   function closeInspector() { if (!state.openFinding) return; state.openFinding = null; renderView(); }
@@ -505,7 +510,10 @@
     const d = active();
     if (state.view === 'design' && d) {
       const ctx = { lib: state.lib, state, hasSheets: !!d.sheetsDrawn };
-      if (state.tab === 'findings') v.innerHTML = PK.pages.findings(d, ensureRun(d), ctx);
+      if (state.tab === 'findings') {
+        if (PK.claude && !PK.claude.get(d)) PK.claude.load(d).then(() => { if (active() === d && state.tab === 'findings') renderView(); });
+        v.innerHTML = PK.pages.findings(d, ensureRun(d), ctx);
+      }
       else if (state.tab === 'parts') v.innerHTML = designPage(d);
       else if (state.tab === 'connectors' && PK.mates) v.innerHTML = connectorsPage(d);
       else if (state.tab === 'schematic' && PK.viewer) { ensureRun(d); PK.viewer.render(v, d, state); }
@@ -813,7 +821,7 @@
     if (t.dataset.sevonly) { state.sev = { error: false, warn: false, info: false, [t.dataset.sevonly]: true }; state.tab = 'findings'; renderTabs(); renderView(); return; }
     if (t.dataset.fopen) { state.openFinding = state.openFinding === t.dataset.fopen ? null : t.dataset.fopen; renderView(); return; }
     if (t.dataset.show && PK.viewer) {
-      const d = active(); const f = d && d.run && d.run.findings.find(x => x.id === t.dataset.show);
+      const d = active(); const f = d && d.run && (d.run.findings.find(x => x.id === t.dataset.show) || (PK.claude && PK.claude.findingLike(d, t.dataset.show)));
       if (f) {
         // From the detail panel, the thumbnail grows into the Schematic tab's view of the finding.
         const zoom = t.closest('#inspector') ? PK.viewer.zoomFromPreview() : null;
@@ -853,9 +861,34 @@
     else if (a === 'export-all') { const b = new Blob([JSON.stringify(state.lib.map(L.strip), null, 2) + '\n'], { type: 'application/json' }); const l = document.createElement('a'); l.href = URL.createObjectURL(b); l.download = 'pincheck-library.json'; l.click(); setTimeout(() => URL.revokeObjectURL(l.href), 1500); }
     else if (a === 'new-part') { const mpn = prompt('Part number'); if (mpn && mpn.trim()) editPart({ schema: L.SCHEMA, id: L.slug(mpn), mpn: mpn.trim(), match: [], manufacturer: '', kind: 'ic', description: '', package: '', datasheet: {}, pins: [], domains: [], values: [], made: { by: who(), at: new Date().toISOString(), how: 'by hand' } }, null, true); }
   });
+  // ── Check with Claude (assets/claude.js, docs/claude-scan.md) ──
+  async function claudeAct(a, t) {
+    const d = active(), C = PK.claude;
+    if (!d || !C) return;
+    if (a === 'ask') { C.sheet(d); return; }
+    if (a === 'reload') { if (state.tab !== 'findings') { state.tab = 'findings'; renderTabs(); } renderView(); await C.load(d, { force: true }); renderView(); return; }
+    if (a === 'open-file') { PK.editor.pickJson((text, name) => { try { C.fromFile(d, text); renderView(); } catch (err) { toast(name + ': ' + err.message, 'error'); } }); return; }
+    try {
+      if (a === 'confirm' || a === 'reject') { C.answer(d, t.dataset.item, { state: a === 'confirm' ? 'confirmed' : 'rejected' }, who()); renderView(); }
+      else if (a === 'accept-all') { const n = C.acceptAll(d, who()); toast('Confirmed ' + plural(n, 'item')); renderView(); }
+      else if (a === 'save') { t.disabled = true; const n = await C.save(d); toast('Saved ' + plural(n, 'answer') + ' to pincheck_data'); renderView(); }
+      else if (a === 'parts') { const texts = await C.partFiles(d); for (const [i, text] of texts.entries()) await importJson(text, C.get(d).parts[i]); }
+    } catch (err) { toast(err.message, 'error'); renderView(); }
+  }
+  document.addEventListener('click', e => { const t = e.target.closest('[data-ck]'); if (t && !t.closest('.sheet-wrap') || (t && t.dataset.ck === 'reload')) claudeAct(t.dataset.ck, t); });
+  // A reply is kept as it's typed (this browser), without redrawing the panel under the cursor.
+  let replyTimer = null;
+  document.addEventListener('input', e => {
+    const id = e.target.dataset && e.target.dataset.ckReply; const d = active();
+    if (!id || !d || !PK.claude) return;
+    clearTimeout(replyTimer);
+    const text = e.target.value;
+    replyTimer = setTimeout(() => { try { PK.claude.answer(d, id, { reply: text }, who()); } catch (err) { toast(err.message, 'error'); } }, 300);
+  });
   document.addEventListener('change', e => {
     const id = e.target.dataset.id, d = active();
     if (id === 'fgroup') { state.check = e.target.value; renderView(); return; }
+    if (id === 'ck-pick' && d && PK.claude) { PK.claude.load(d, { id: e.target.value }).then(renderView); return; }
     // The build variant: mark its parts not fitted and check again (a stored run too, which then leaves its sent findings).
     if (id === 'variant' && d) {
       d.variant = e.target.value;

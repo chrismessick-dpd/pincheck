@@ -340,7 +340,8 @@
 
     // ── Findings ──
     focus(id, animate) {
-      const f = this.live().find(x => x.id === id) || ((this.d.run && this.d.run.findings) || []).find(x => x.id === id);
+      const f = this.live().find(x => x.id === id) || ((this.d.run && this.d.run.findings) || []).find(x => x.id === id) ||
+        (PK.claude && PK.claude.findingLike(this.d, id)); // an item of Claude's scan (assets/claude.js)
       if (!f) return;
       this.sel = f.id;
       const hits = hitsOf(this.m, f);

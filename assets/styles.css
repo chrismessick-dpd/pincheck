@@ -415,3 +415,24 @@ body.pk-dragging .pk-dropzone { display: grid; }
   .pk-t-dot { display: none; }
   .pk-variant { font-size: 20px; }
 }
+/* Check with Claude (assets/claude.js): Claude's scan above the offline findings. Its items carry a "Claude" tag
+   (text and a mark, never color alone) and their answer in words: ✓ Confirmed, ✕ Not a problem. */
+.pk-tag-claude { display: inline-flex; align-items: center; gap: 3px; font: 600 10.5px var(--sans); padding: 1px 6px; border-radius: 5px; border: 1px solid var(--accent); color: var(--accent); white-space: nowrap; vertical-align: 1px; }
+.pk-ck-head { flex-wrap: wrap; align-items: center; }
+.pk-ck-head .spacer { flex: 1; }
+.pk-ck-head .btn, .pk-ck-pick { font-family: var(--sans); }
+.pk-ck-pick { width: auto; padding: 3px 8px; font-size: 12.5px; }
+.pk-ck-sum { margin: -4px 0 10px; font-size: 12.5px; }
+.pk-ck-type { font: 600 12px var(--sans); text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-3); margin: 14px 0 6px; }
+.pk-ck-row .pk-fhead { align-items: center; }
+.pk-ck-row .pk-ftitle { flex: 1; }
+.pk-ck-state { font: 500 11.5px var(--sans); color: var(--text-3); white-space: nowrap; }
+.pk-ck-state.on { color: var(--text); font-weight: 600; }
+.pk-ck-state.off { color: var(--text-2); text-decoration: line-through; text-decoration-thickness: 1px; }
+.pk-ck-row.answered:not(.open) { opacity: 0.85; }
+.pk-ck-offline { font: 600 15px var(--display); margin: 30px 0 -14px; padding-top: 14px; border-top: 1px solid var(--hair); }
+.pk-ck-what { font-size: 12.5px; margin: 6px 0 10px; }
+.pk-ck-answer { margin: 0 0 14px; padding: 10px; border-radius: 8px; background: var(--bg-sunk); }
+.pk-ck-answer .pk-btns { margin: 0 0 8px; }
+.pk-ck-reply { width: 100%; resize: vertical; font-size: 13px; }
+.pk-ck-off { font-size: 12.5px; }

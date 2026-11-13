@@ -1,0 +1,57 @@
+{
+  "schema": "pincheck.scan/1",
+  "id": "20261113-1800",
+  "design": "Main PCBA (DT-1042 rev B)",
+  "at": "2026-11-13T18:00:00Z",
+  "by": "pincheck-scan skill",
+  "model": "claude-opus-5-5",
+  "reviewed": [
+    { "area": "Power: the mains input, PS1, the USB-C input, and U7's 3.3 V buck", "sheets": ["Power.SchDoc"], "checked": ["every rail's source and load", "U7's feedback divider and output", "U7's input, output, and bootstrap capacitors", "USB-C CC pull-downs", "the fuse ahead of PS1"] },
+    { "area": "MCU: U4 and its support", "sheets": ["MCU.SchDoc"], "checked": ["supply and decoupling", "NRST and BOOT0", "UART, I2C, and interrupt pins against their functions"] },
+    { "area": "I/O: relays, the display and touch connectors, and U1", "sheets": ["IO.SchDoc"], "checked": ["relay drivers and flyback diodes", "I2C pull-ups once per bus", "U1's UART to U4"] }
+  ],
+  "agrees": ["func.exti:U4.11", "func.uart:U4.30", "func.uart:U4.31"],
+  "items": [
+    {
+      "id": "c1",
+      "type": "missed",
+      "severity": "error",
+      "title": "USB-C VBUS and PS1's output both drive 5V",
+      "detail": "J3's VBUS pins and PS1's +VOUT are on the same net with no diode or switch between them. With both plugged in, the USB host and PS1 fight, and PS1 back-feeds the host's VBUS.",
+      "refs": ["J3", "PS1"],
+      "pins": ["J3.A4", "J3.B4", "PS1.3"],
+      "nets": ["5V"],
+      "evidence": [{ "says": "J3 A4 and B4 (VBUS) and PS1 pin 3 (+VOUT) are all on 5V; no other part sits between them" }],
+      "rule": "A connector's power pin and a converter or regulator output on one net, with no diode, ideal diode, or load switch between them, is two sources on one rail",
+      "check": "supply.rails",
+      "confidence": "high"
+    },
+    {
+      "id": "c2",
+      "type": "data",
+      "severity": "warn",
+      "title": "PS1 has no part file, so the checks don't see it as a 5 V source",
+      "detail": "Without a part file, PS1's +VOUT isn't a power-out pin, so supply.rails can't find two sources on 5V, and 5V's voltage comes only from its name.",
+      "refs": ["PS1"],
+      "pins": ["PS1.3"],
+      "nets": ["5V"],
+      "evidence": [{ "says": "PS1 (RAC02-05SK) has no part file in the library" }],
+      "check": "supply.rails",
+      "needs": "A part file for RAC02-05SK with pin 3 as power-out and reg.vout 5 V",
+      "confidence": "high"
+    },
+    {
+      "id": "c3",
+      "type": "idea",
+      "severity": "info",
+      "title": "Mark J3 as a power input so its protection is checked",
+      "detail": "J3 brings 5 V onto the board, but the Connectors tab doesn't say so, so power.protection and power.contacts skip it. There's no TVS on 5V.",
+      "refs": ["J3"],
+      "nets": ["5V"],
+      "check": "power.protection",
+      "confidence": "medium"
+    }
+  ],
+  "parts": { "filled": [], "notFound": [] },
+  "notCheckable": ["Title blocks and notes (not in the netlist)", "Layout: creepage between AC_L and the low-voltage side"]
+}

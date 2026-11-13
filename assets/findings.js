@@ -16,7 +16,7 @@
   function head(d, sub) {
     const src = d.source === 'kicad' ? 'KiCad netlist' : d.netlist ? 'Altium schematic and Protel2 netlist' : d.source === 'altium' ? 'Altium schematic' : 'Schematic';
     return '<div class="page-head"><div class="page-head-text"><div class="pk-title-row"><div class="eyebrow pk-t-src">' + esc(src) + '</div><h1 class="page-title pk-t-name">' + esc(d.name) + '</h1>' + variantBar(d) + '</div><div class="page-sub">' + sub + '</div></div>' +
-      '<div class="pk-head-actions"><button class="btn" data-act="rerun" title="Run the checks again with the library as it is now">Run checks again</button></div></div>' + storedNote(d);
+      '<div class="pk-head-actions">' + (PK.claude ? '<button class="btn" data-ck="ask" title="Hand the whole project to Claude, beyond the offline checks">Check with Claude…</button>' : '') + '<button class="btn" data-act="rerun" title="Run the checks again with the library as it is now">Run checks again</button></div></div>' + storedNote(d);
   }
   // A run reopened from Signoff EE (docs/send-to-signoff-ee.md): its findings as sent, not checked again.
   function storedNote(d) {
@@ -94,6 +94,9 @@
     h += '<div class="pk-ftools"><input class="input pk-fq" data-id="fq" placeholder="Filter findings (part, net, or words)" value="' + esc(st.q || '') + '">' +
       '<div class="seg sev-seg">' + ['error', 'warn', 'info'].map(s => '<button data-sev="' + s + '" class="' + (sevOn[s] ? 'on' : '') + '"><span class="pk-sevdot pk-sev-' + s + '" aria-hidden="true">' + SEV[s][0] + '</span>' + SEV[s][2] + ' <span class="count">' + cc[s] + '</span></button>').join('') + '</div>' +
       '<select class="input pk-fgroup" data-id="fgroup"><option value="">Every check</option>' + groups().map(g => '<optgroup label="' + esc(g) + '"><option value="group:' + esc(g) + '"' + (st.check === 'group:' + g ? ' selected' : '') + '>All ' + esc(g.toLowerCase()) + '</option>' + C.CATALOG.filter(c => c.group === g).map(c => '<option value="' + c.key + '"' + (st.check === c.key ? ' selected' : '') + '>' + esc(c.title) + '</option>').join('') + '</optgroup>').join('') + '</select></div>';
+    // Claude's scan of this design (assets/claude.js), above the offline findings, under the same filter.
+    if (PK.claude && !st.check) h += PK.claude.section(d, st, it => sevOn[it.severity] && (!q || (it.title + ' ' + it.detail + ' ' + (it.refs || []).join(' ') + ' ' + (it.nets || []).join(' ')).toLowerCase().includes(q)), ctx) +
+      (shown.length || waivedList.length ? '<div class="pk-ck-offline">Offline checks</div>' : '');
     if (!shown.length && !waivedList.length) return h + '<div class="empty"><h2>' + (run.findings.length ? 'Nothing matches' : 'No findings') + '</h2><p>' + (run.findings.length ? 'Change the filter or the severities.' : 'Every check that had the data it needs passed.') + '</p></div></div>';
     for (const g of groups()) {
       const list = shown.filter(f => f.group === g);

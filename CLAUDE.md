@@ -77,6 +77,16 @@ the suite's hard rules.
   `io.absmax.off`. Pushed `d045099`, then the variant picker and the 2.5 s scan `b2fe328`. See `docs/checks.md`, *Logic levels
   between parts*.
 
+- **Check with Claude and self-improve (2026-11-13, Chris; not committed):** a whole project handed to Claude beside
+  the offline check, and what Claude finds made into offline checks. Everything is in `docs/claude-scan.md`.
+  `tools/scan.js` runs the offline checks headless (Node, the page's own assets), writes the design as text for
+  Claude, and moves scans to and from `pincheck_data` (`scans/<design>/<id>/`, new files only, dry run first). Skills:
+  `pincheck-scan` (`skill/scan/SKILL.md`) and `pincheck-improve` (`skill/improve/SKILL.md`), both copied to
+  `../.claude/skills/`. Pincheck's Findings shows a design's latest scan above the offline findings (`assets/claude.js`),
+  each item with Confirm, Not a problem, a reply, and Accept all, saved as the scan's `decisions.json`; the head's
+  *Check with Claude…* writes the prompt. The demo has a made-up scan (`demo/claude-scan.json`). Ledger:
+  `docs/learned.md`. A netlist part now keeps the SchDoc sheets it's drawn on (`design.js`).
+
 ## Rules
 
 - **No client data in this repo.** Not in code, docs, tests, demo, or commit messages. Real projects
@@ -87,8 +97,10 @@ the suite's hard rules.
 - **Checks never call an LLM.** The `pincheck-part` skill only makes part files, and only a person
   sets `ok` on a value.
 - **A failure resting on an unverified value is a warning** (Chris).
-- **The skill's source is `skill/SKILL.md`.** After changing it, copy it to
-  `../.claude/skills/pincheck-part/SKILL.md`.
+- **The skills' sources are `skill/SKILL.md` (pincheck-part), `skill/scan/SKILL.md`, and `skill/improve/SKILL.md`.**
+  After changing one, copy it to `../.claude/skills/<pincheck-part|pincheck-scan|pincheck-improve>/SKILL.md`.
+- **Claude scans hold client data:** they live only in `pincheck_data` and `C:/Dovetail/scratch`. Rules self-improve
+  adds are general, with made-up tests.
 - **Severity never by hue alone** (Chris is colorblind): warnings use `--warn-hatch` and ▲, errors
   `--issue-hatch` and ✕.
 - **American English, metric, and the serial comma** in UI text, docs, and commit messages.
@@ -102,7 +114,7 @@ the suite's hard rules.
    change to `model.js` or `github.js`.
 2. `python tools/stamp_version.py`.
 3. Serve the tools folder (preview `signoff-suite-alt`, port 8774) and open `pincheck/tests/test.html`:
-   PASS (45 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
+   PASS (45 tests), and `node tests/scan_test.js` (4). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
    three sheets.
 4. In the browser pane, scripts are cached: fetch changed files with `{cache: 'reload'}` first. The demo
    library is loaded into IndexedDB `pincheck-demo` once; delete that database to reload it.
