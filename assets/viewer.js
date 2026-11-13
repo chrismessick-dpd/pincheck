@@ -608,7 +608,9 @@
         cv.classList.remove('grabbing');
         if (drag && !moved && e.type === 'pointerup') {
           const hit = this.pick(...pos(e));
+          // A click on a mark selects its finding; anywhere else (no drag) lets go of the selection, as Clear does.
           if (hit && hit.finding) this.focus(hit.finding, true);
+          else if (this.sel) { this.sel = null; this.renderRail(); this.draw(); }
         }
         drag = null;
       };
