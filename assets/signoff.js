@@ -38,7 +38,10 @@
   const BY_CHECK = { 'supply.range': 's-pwr', 'supply.absmax': 's-pwr', 'supply.unpowered': 's-pwr', 'supply.tied': 's-pwr', 'supply.ground': 's-gnd',
     'supply.switchnode': 's-reg', 'supply.rails': 's-reg', 'parts.regulator': 's-reg', 'parts.decoupling': 's-dec', 'parts.ext': 's-dec',
     'io.contention': 's-net', 'pins.dnc': 's-net', 'pins.unused': 's-net', 'pins.float': 's-clk', 'parts.crystal': 's-clk',
-    'io.absmax': 's-dig', 'io.recommended': 's-dig', 'io.vih': 's-dig', 'straps.i2c': 's-dig' };
+    'io.absmax': 's-dig', 'io.recommended': 's-dig', 'io.vih': 's-dig', 'straps.i2c': 's-dig',
+    // From the first Claude scan (2026-11-13, docs/learned.md).
+    'supply.offboard': 's-pwr', 'supply.charge': 's-pwr', 'parts.sense': 's-pwr', 'nets.names': 's-net', 'nets.dangling': 's-net', 'nets.pulls': 's-net',
+    'conn.contacts': 's-net', 'func.i2cpull': 's-dig', 'func.switch': 's-dig', 'straps.output': 's-dig' };
   function sectionFor(check) { return BY_CHECK[check] || (/^func\./.test(check) ? 's-mcu' : 's-cmp'); }
 
   function projects() {

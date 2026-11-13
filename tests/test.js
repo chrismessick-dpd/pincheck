@@ -255,7 +255,8 @@
     const v = n => (r.rails.find(x => x.net === n) || {}).v;
     eq([v('V1.8CORE'), v('NetFB')], [1.8, 1.8], 'V1.8CORE by name, NetFB from FIXREG on its FB pin');
     eq(['V3.3IO', 'V1.8MCU', '+V1.8_INT', 'V5USB', 'SMPS1.8'].map(CK.voltageFromName), [3.3, 1.8, 1.8, null, null]);
-    const left = r.findings.filter(f => !/^library\./.test(f.check)).map(f => f.check + ': ' + f.title);
+    // Its connector feeding a regulator directly is a power.protection note since 2026-11-13, not what this board tests.
+    const left = r.findings.filter(f => !/^library\./.test(f.check) && f.check !== 'power.protection').map(f => f.check + ': ' + f.title);
     eq(left, [], 'nothing to report');
     // Take C2 away and the CP note is checked between CP and BATT, not to ground.
     q.design.nets.find(n => n.name === 'CP_CHG').nodes.pop(); q.design.nets.find(n => n.name === 'VBAT_CHG').nodes.splice(2, 1);
@@ -264,6 +265,190 @@
     const q2 = quirks(); q2.design.nets.find(n => n.name === 'AMISO').name = 'USB_DM';
     ok(CK.run(q2.design, q2.lib).findings.some(f => f.check === 'supply.range' && /VDDUSB/.test(f.title)), 'VDDUSB checked when USB is wired');
   });
+  // Checks a Claude scan of a real board taught the offline check (docs/learned.md, scan 20261113-2223). Every board
+  // here is made up; each test fails without its check.
+  const sb = (() => {
+    const pin = (num, name, type) => ({ num: String(num), name, type: type || 'passive' });
+    const part = (ref, mpn, kind, names, params) => ({ ref, mpn, kind, params: params || {}, pins: names.map((n, i) => pin(i + 1, n)) });
+    const two = (ref, kind, value, params) => ({ ref, mpn: '', kind, params: Object.assign({ Value: value }, params || {}), pins: [pin(1, '1'), pin(2, '2')] });
+    const file = (mpn, kind, pins, values, extra) => Object.assign({ schema: 'pincheck.part/1', id: mpn.toLowerCase(), mpn, kind, match: [], datasheet: {}, domains: [...new Set(pins.filter(p => p.domain).map(p => p.domain))], pins, values: values || [] }, extra || {});
+    const fp = (num, name, role, domain, extra) => Object.assign({ num: String(num), name, role }, domain ? { domain } : {}, extra || {});
+    const nets = obj => Object.entries(obj).map(([name, nodes]) => ({ name, nodes: nodes.map(s => { const [ref, p] = s.split('.'); return { ref, pin: p }; }) }));
+    const design = (parts, n, extra) => Object.assign({ parts, nets: nets(n), sheets: [], notes: [] }, extra || {});
+    const okv = { by: 't' };
+    const has = (r, check, re, sev) => r.findings.find(f => f.check === check && re.test(f.title) && (!sev || f.severity === sev));
+    return { pin, part, two, file, fp, nets, design, okv, has };
+  })();
+
+  t('scan: a 0 Ω jumper is a link, and a regulator it holds off makes no rail and only notes', () => {
+    const { part, two, file, fp, design, okv, has } = sb;
+    const build = desc => design([
+      part('U1', 'REG1', 'ic', ['VIN', 'GND', 'EN', 'VOUT']),
+      Object.assign(part('Y1', '', 'crystal', ['1', '2', '3'], { Comment: '0', Description: desc })),
+      two('C1', 'capacitor', '1uF'),
+    ], { '+5V': ['U1.1', 'Y1.3'], GND: ['U1.2', 'Y1.2', 'C1.2'], EN_X: ['U1.3', 'Y1.1'], OUT_X: ['U1.4', 'C1.1'] });
+    const lib = [file('REG1', 'regulator', [fp(1, 'VIN', 'power-in', 'VIN'), fp(2, 'GND', 'ground'), fp(3, 'EN', 'enable', 'VIN'), fp(4, 'VOUT', 'power-out')],
+      [{ k: 'reg.vout', typ: 3.3, unit: 'V', ok: okv }, { k: 'reg.cout', min: 10e-6, unit: 'F', ok: okv }])];
+    const off = CK.run(build('3pin 0402 with 1-2 connected with 0 ohm'), lib);
+    ok(!off.findings.some(f => f.check === 'library.coverage' && f.refs.includes('Y1')), 'a jumper needs no part file');
+    ok(has(off, 'parts.regulator', /U1 is fitted but held off: its EN is on EN_X/, 'warn'), 'held off');
+    eq(has(off, 'parts.regulator', /U1 output has 1 µF/).severity, 'info', 'its capacitor finding is a note');
+    ok(!off.rails.some(r => r.net === 'OUT_X'), 'no rail from a regulator held off');
+    const on = CK.run(build('3pin 0402 with 1-3 connected with 0 ohm'), lib);
+    ok(!has(on, 'parts.regulator', /held off/) && on.rails.some(r => r.net === 'OUT_X' && r.v === 3.3), 'jumped 1-3: EN on +5V, running');
+    eq(has(on, 'parts.regulator', /U1 output has 1 µF/).severity, 'warn');
+    eq(D.classify({ ref: 'Y3', pins: [{}, {}, {}], params: { Comment: '0' } }), 'other', 'a zero-valued Y is not a crystal');
+  });
+
+  t('scan: two names on one wire, and an unpowered supply pin names its power port and its tie', () => {
+    const { part, two, file, fp, design, okv, has } = sb;
+    const d = design([part('U1', 'MCU9', 'ic', ['VDD', 'VSS', 'VDDSMPS']), two('C1', 'capacitor', '10uF')],
+      { '+3V3': ['U1.1'], GND: ['U1.2', 'C1.2'], VSMPS_IN: ['U1.3', 'C1.1'] },
+      { drawings: [{ name: 'MCU.SchDoc', pins: [{ ref: 'U1', num: '3', x: 100, y: 0 }, { ref: 'C1', num: '1', x: 200, y: 0 }], wires: [[100, 0, 200, 0]], junctions: [], labels: [{ x: 120, y: 0, text: 'VSMPS_IN' }], powers: [{ x: 160, y: 0, text: 'VDD_CORE' }], ports: [], sheets: [] }] });
+    const lib = [file('MCU9', 'mcu', [fp(1, 'VDD', 'power-in', 'VDD'), fp(2, 'VSS', 'ground'), fp(3, 'VDDSMPS', 'power-in', 'VDDSMPS')], [{ k: 'supply.tied', list: ['VDDSMPS to VDD (SMPS used)'], ok: okv }])];
+    const r = CK.run(d, lib);
+    ok(has(r, 'nets.names', /VSMPS_IN also carries VDD_CORE/, 'warn'), 'two names');
+    const u = has(r, 'supply.unpowered', /U1 VDDSMPS .* not on a supply rail: tie it to VDD \(\+3V3\)/, 'error');
+    ok(u && /power port VDD_CORE, which nothing else in the design is on/.test(u.detail), 'names the lonely power port');
+  });
+
+  t('scan: nets that reach nothing, two pull-ups, and BOM fields that disagree', () => {
+    const { part, two, file, fp, design, has } = sb;
+    const tp = { ref: 'TP1', mpn: '', kind: 'other', params: { Footprint: 'TP_1P0MM' }, pins: [{ num: '1', name: '1' }] };
+    const d = design([part('J1', 'HDR4', 'connector', ['1', '2', '3', '4']), tp, part('U9', 'ESD4', 'ic', ['IO1', 'GND', 'NC6']),
+      two('R1', 'resistor', '100k'), two('R2', 'resistor', '200k'), part('U2', 'LOGIC1', 'ic', ['A', 'VCC', 'GND']),
+      two('C5', 'capacitor', '470nF', { Comment: '0.1uF 6.3V' }), two('R5', 'resistor', '?'), part('U3', 'ABC1234', 'ic', ['1', '2', '3', '4', '5'], { Value: 'XYZ9876' })],
+      { MIC_DATA: ['J1.1', 'TP1.1'], UNUSED_IN: ['U9.1', 'U9.3'], GND: ['U9.2', 'U2.3', 'J1.4'], INT_N: ['U2.1', 'R1.1', 'R2.1'], '+3V3': ['R1.2', 'R2.2', 'U2.2'] });
+    const lib = [file('ESD4', 'protection', [fp(1, 'IO1', 'io'), fp(2, 'GND', 'ground'), fp(3, 'NC6', 'nc')])];
+    const r = CK.run(d, lib);
+    ok(has(r, 'nets.dangling', /MIC_DATA reaches only J1 pin 1 and test points/, 'warn'), 'connector and a test point');
+    ok(has(r, 'nets.dangling', /UNUSED_IN reaches only U9, a protection part/, 'info'), 'an ESD channel to nothing');
+    ok(has(r, 'nets.pulls', /INT_N has 2 pull resistors to \+3V3/, 'info'), 'two pull-ups');
+    ok(has(r, 'parts.fields', /C5: its Value says 470 nF and its Comment 100 nF/, 'warn'), 'capacitor fields');
+    ok(has(r, 'parts.fields', /R5: its value is "\?"/, 'warn'), 'no value');
+    ok(has(r, 'parts.fields', /U3: its Value says XYZ9876 but its part number is ABC1234/, 'warn'), 'IC value names another part');
+  });
+
+  t('scan: I2C pull-ups, off the board with the voltage window, or missing', () => {
+    const { part, two, file, fp, design, has } = sb;
+    const lib = [file('SENS1', 'sensor', [fp(1, 'VDD', 'power-in', 'VDD'), fp(2, 'GND', 'ground'), fp(3, 'SDA', 'open-drain', 'VDD', { absmax: 2.2 }), fp(4, 'SCL', 'input', 'VDD', { absmax: 2.2 })], [{ k: 'io.vih', on: 'VDD', value: 1.05, unit: 'V', ok: { by: 't' } }])];
+    const off = CK.run(design([part('U1', 'SENS1', 'ic', ['VDD', 'GND', 'SDA', 'SCL']), part('J1', 'HDR4', 'connector', ['1', '2', '3', '4'])],
+      { '+1V8': ['U1.1', 'J1.1'], GND: ['U1.2', 'J1.4'], SDA_A: ['U1.3', 'J1.2'], SCL_A: ['U1.4', 'J1.3'] }), lib);
+    const f = has(off, 'func.i2cpull', /SDA_A and SCL_A have no pull-ups on this board/, 'warn');
+    ok(f && /between 1\.05 V .* and 2\.2 V/.test(f.detail), 'the window: highest VIH to lowest maximum');
+    const none = CK.run(design([part('U1', 'SENS1', 'ic', ['VDD', 'GND', 'SDA', 'SCL']), part('U2', 'SENS1', 'ic', ['VDD', 'GND', 'SDA', 'SCL'])],
+      { '+1V8': ['U1.1', 'U2.1'], GND: ['U1.2', 'U2.2'], SDA_B: ['U1.3', 'U2.3'], SCL_B: ['U1.4', 'U2.4'] }), lib);
+    ok(has(none, 'func.i2cpull', /SDA_B and SCL_B have no pull-ups$/, 'error'), 'no pull-ups at all');
+    // A resistor array, and a pull-up past a 22 Ω series resistor, are pull-ups.
+    const arr = CK.run(design([part('U1', 'SENS1', 'ic', ['VDD', 'GND', 'SDA', 'SCL']), part('U2', 'SENS1', 'ic', ['VDD', 'GND', 'SDA', 'SCL']), part('RN1', '', 'resistor', ['1', '2', '3', '4'], { Value: '4.7k' })],
+      { '+1V8': ['U1.1', 'U2.1', 'RN1.2', 'RN1.4'], GND: ['U1.2', 'U2.2'], SDA_C: ['U1.3', 'U2.3', 'RN1.1'], SCL_C: ['U1.4', 'U2.4', 'RN1.3'] }), lib);
+    ok(!arr.findings.some(f => f.check === 'func.i2cpull'), 'a resistor array pulls up');
+    const ser = CK.run(design([part('U1', 'SENS1', 'ic', ['VDD', 'GND', 'SDA', 'SCL']), part('U2', 'SENS1', 'ic', ['VDD', 'GND', 'SDA', 'SCL']), two('R1', 'resistor', '22'), two('R2', 'resistor', '22'), two('R3', 'resistor', '4.7k'), two('R4', 'resistor', '4.7k')],
+      { '+1V8': ['U1.1', 'U2.1', 'R3.2', 'R4.2'], GND: ['U1.2', 'U2.2'], SDA_D: ['U1.3', 'R1.1'], SDA_E: ['R1.2', 'U2.3', 'R3.1'], SCL_D: ['U1.4', 'R2.1'], SCL_E: ['R2.2', 'U2.4', 'R4.1'] }), lib);
+    ok(!ser.findings.some(f => f.check === 'func.i2cpull'), 'pull-ups past 22 Ω series resistors');
+  });
+
+  t('scan: debug header without reset, unprotected power into an eFuse, limits above contacts, and load lines', () => {
+    const { part, two, file, fp, design, has } = sb;
+    const d = design([
+      part('J2', 'TAG4', 'connector', ['VREF', 'SWDIO', 'SWCLK', 'GND']), part('J3', 'PWR2', 'connector', ['1', '2']), part('U5', 'EFUSE1', 'ic', ['IN', 'OUT', 'ILM', 'GND']),
+      two('R9', 'resistor', '1k'), part('U6', 'LDO1', 'ic', ['IN', 'GND', 'OUT']), part('J4', 'FLEX4', 'connector', ['1', '2', '3', '4']), two('C6', 'capacitor', '1uF')],
+      { '+3V3': ['J2.1'], AR_SWDIO: ['J2.2'], AR_SWCLK: ['J2.3'], GND: ['J2.4', 'J3.2', 'U5.4', 'R9.2', 'U6.2', 'J4.4', 'C6.2'], VIN_RAW: ['J3.1', 'U5.1'], VOUT_F: ['U5.2'], ILM_N: ['U5.3', 'R9.1'],
+        CAM_IN: ['J4.1', 'U6.1'], CAM_OUT: ['U6.3', 'C6.1'], SPK_OUTP: ['J4.2'] });
+    const lib = [
+      file('EFUSE1', 'switch', [fp(1, 'IN', 'power-in', 'IN'), fp(2, 'OUT', 'power-out'), fp(3, 'ILM', 'analog'), fp(4, 'GND', 'ground')], [{ k: 'sw.ilim', min: 0.5, max: 6, unit: 'A', note: 'RILM (Ω) = 3334 / ILIM (A)' }]),
+      file('LDO1', 'regulator', [fp(1, 'IN', 'power-in', 'IN'), fp(2, 'GND', 'ground'), fp(3, 'OUT', 'power-out')], [{ k: 'reg.iout', value: 0.4, unit: 'A' }, { k: 'reg.vout', typ: 0.9, unit: 'V' }]),
+      file('PWR2', 'connector', [fp(1, '1', 'other'), fp(2, '2', 'other')], [{ k: 'rate.i', value: 2, unit: 'A' }]),
+      file('FLEX4', 'connector', [1, 2, 3, 4].map(n => fp(n, String(n), 'other')), [{ k: 'rate.i', value: 0.3, unit: 'A' }]),
+    ];
+    const r = CK.run(d, lib);
+    ok(has(r, 'conn.mate', /J2 carries AR_SWDIO and AR_SWCLK but no reset/, 'warn'), 'debug header without reset');
+    ok(has(r, 'power.protection', /J3 brings VIN_RAW into U5 with no TVS or input capacitor/, 'warn'), 'unprotected power into an eFuse');
+    ok(has(r, 'power.contacts', /U5's current limit \(about 3\.334 A, up to 3\.667 A\) is above J3's 2 A/, 'warn'), 'limit above the contacts');
+    ok(has(r, 'power.contacts', /U6 can draw 400 mA on CAM_IN through 1 of J4's 300 mA contacts/, 'warn'), 'LDO input on one contact');
+    ok(has(r, 'power.contacts', /SPK_OUTP crosses J4 on one 300 mA contact/, 'warn'), 'a speaker line');
+    ok(!r.findings.some(f => f.check === 'power.protection' && /CAM_IN/.test(f.title) && f.severity === 'warn'), 'a regulator fed from a flex is a note, not a warning');
+  });
+
+  t('scan: strapped outputs, an overvoltage trip above the loads, a programmable maximum, a charger, a sense range, and a battery rail', () => {
+    const { part, two, file, fp, design, okv, has } = sb;
+    const d = design([
+      part('U7', 'STRAPREG', 'ic', ['VIN', 'GND', 'SEL', 'CFG1', 'CFG2', 'VOUT']), two('R1', 'resistor', '36.5k'),
+      part('U5', 'EFUSE2', 'ic', ['IN', 'OUT', 'OVLO', 'GND']), two('R10', 'resistor', '383k'), two('R11', 'resistor', '100k'),
+      part('U8', 'PROGREG', 'ic', ['VIN', 'GND', 'VOUT']), part('U9', 'LOAD5', 'ic', ['VDD', 'GND']),
+      part('U10', 'CHG1', 'ic', ['BATT', 'PCKP', 'CSP', 'CSN', 'GND']), two('R12', 'resistor', '0.05'), two('R13', 'resistor', '1k'),
+      part('J5', 'BAT2', 'connector', ['1', '2']), { ref: 'D1', mpn: '', kind: 'diode', params: { Value: 'BAT54' }, pins: [sb.pin(1, 'A'), sb.pin(2, 'K')] }],
+      { '+5V': ['U7.1', 'U7.3'], GND: ['U7.2', 'R1.2', 'U7.5', 'U5.4', 'R11.2', 'U8.2', 'U9.2', 'U10.5', 'J5.2'], CFG1_N: ['U7.4', 'R1.1'], NODE_OUT: ['U7.6'],
+        VBUS_IN: ['U5.1', 'R10.1'], OVLO_N: ['U5.3', 'R10.2', 'R11.1'], VBUS_P: ['U5.2', 'U8.1'],
+        SYS: ['U8.3', 'U9.1', 'R13.1', 'D1.2'], PCKP_N: ['U10.2', 'R13.2'], BAT_P: ['J5.1', 'D1.1', 'R12.1', 'U10.3'], CELL: ['R12.2', 'U10.4', 'U10.1'] });
+    const lib = [
+      file('STRAPREG', 'regulator', [fp(1, 'VIN', 'power-in', 'VIN'), fp(2, 'GND', 'ground'), fp(3, 'SEL', 'input', 'VIN'), fp(4, 'CFG1', 'boot'), fp(5, 'CFG2', 'boot'), fp(6, 'VOUT', 'power-out')],
+        [{ k: 'reg.vout.strap', list: ['SEL = high, CFG1 = 30.1 kΩ, CFG2 = 0 Ω | 511 Ω: 3.2 V', 'SEL = high, CFG1 = 36.5 kΩ, CFG2 = 0 Ω | 511 Ω: 3.3 V', 'SEL = low, CFG3 = 0 Ω: 1.8 V'], ok: okv }]),
+      file('EFUSE2', 'switch', [fp(1, 'IN', 'power-in', 'IN'), fp(2, 'OUT', 'power-out'), fp(3, 'OVLO', 'analog'), fp(4, 'GND', 'ground')], [{ k: 'sw.ovlo', min: 1.183, typ: 1.2, max: 1.223, unit: 'V', ok: okv }]),
+      file('PROGREG', 'regulator', [fp(1, 'VIN', 'power-in', 'VIN'), fp(2, 'GND', 'ground'), fp(3, 'VOUT', 'power-out')], [{ k: 'reg.vout', typ: 3.3, unit: 'V', cond: 'Power-up default; set by I2C', ok: okv }, { k: 'reg.vout.range', min: 1, max: 5.5, unit: 'V', ok: okv }, { k: 'supply.range', on: 'VIN', min: 1.6, max: 5.5, unit: 'V', ok: okv }]),
+      file('LOAD5', 'ic', [fp(1, 'VDD', 'power-in', 'VDD'), fp(2, 'GND', 'ground')], [{ k: 'supply.range', on: 'VDD', min: 2.7, max: 5, unit: 'V', ok: okv }]),
+      file('CHG1', 'power', [fp(1, 'BATT', 'power-in', 'BATT'), fp(2, 'PCKP', 'power-in', 'PCKP'), fp(3, 'CSP', 'analog'), fp(4, 'CSN', 'analog'), fp(5, 'GND', 'ground')], [{ k: 'reg.vout.range', min: 3.56, max: 4.835, unit: 'V', ok: okv }, { k: 'sense.vfs', value: 0.0512, unit: 'V', ok: okv }]),
+    ];
+    const conn = { assign: [{ ref: 'J5', power: { pins: ['1'], return: ['2'], v: { min: 3, max: 4.4 }, i: 1 } }], profiles: {} };
+    const r = CK.run(d, lib, conn);
+    const rail = n => r.rails.find(x => x.net === n) || {};
+    eq(rail('NODE_OUT').v, 3.3, 'the strap line the board matches');
+    ok(/strapped SEL high, CFG1 36\.5 kΩ, CFG2 0 Ω/.test(rail('NODE_OUT').from), 'says which straps');
+    ok(has(r, 'supply.range', /U5's overvoltage cutoff lets VBUS_P reach 5\.907 V, above U8 VIN's 5\.5 V/, 'warn'), 'OVLO trip above the load');
+    ok(has(r, 'supply.range', /U9 VDD .* would be at 5\.5 V if U8 is set to its maximum/, 'warn'), 'programmable maximum');
+    ok(has(r, 'supply.charge', /U10 PCKP is fed from U8, which starts at 3\.3 V, below the 3\.56 V charge voltage/, 'warn'), 'charger below its charge voltage');
+    ok(has(r, 'parts.sense', /U10 measures and protects up to about 1\.024 A through R12/, 'info'), 'sense range');
+    ok(/also J5 power input/.test(rail('SYS').from), 'the battery joins SYS beside U8');
+  });
+
+  t('scan: false alarms gone: VOL into CMOS inputs, capacitors that add up, conditional bulk, pin aliases, and default addresses', () => {
+    const { part, two, file, fp, design, okv, has } = sb;
+    eq(L.pinCheck({ pins: [{ num: '2', name: 'SYNC', aliases: ['MODE'] }, { num: '3', name: 'SW1' }, { num: '5', name: 'PH0-OSC_IN' }, { num: '6', name: 'PGND' }, { num: '7', name: 'SDA' }] },
+      { pins: [{ num: '2', name: 'MODE' }, { num: '3', name: 'LX1' }, { num: '5', name: 'PH0 / UNUSED' }, { num: '6', name: 'GND' }, { num: '7', name: 'SCL' }] }).map(m => m.num), ['7'], 'only the real mismatch');
+    const mk = withPull => design([part('U1', 'MCU7', 'ic', ['VDD', 'VSS', 'PA2']), part('U2', 'LSW1', 'ic', ['VIN', 'GND', 'ON', 'VOUT']), two('R1', 'resistor', '1k')],
+      Object.assign({ '+1V8': ['U1.1'], '+3V3': ['U2.1'], GND: ['U1.2', 'U2.2'], ON_X: ['U1.3', 'U2.3'].concat(withPull ? ['R1.1'] : []), OUT_X: ['U2.4'] }, withPull ? { '+3V3': ['U2.1', 'R1.2'] } : {}));
+    const lib = [file('MCU7', 'mcu', [fp(1, 'VDD', 'power-in', 'VDD'), fp(2, 'VSS', 'ground'), fp(3, 'PA2', 'io', 'VDD')], [{ k: 'io.vol', on: 'VDD', value: 0.4, unit: 'V', cond: '|IIO| = 4 mA', ok: okv }]),
+      file('LSW1', 'switch', [fp(1, 'VIN', 'power-in', 'VIN'), fp(2, 'GND', 'ground'), fp(3, 'ON', 'enable', 'VIN'), fp(4, 'VOUT', 'power-out')], [{ k: 'io.vil', on: 'VIN', value: 0.35, unit: 'V', ok: okv }])];
+    ok(!CK.run(mk(false), lib).findings.some(f => f.check === 'io.vil'), 'nanoamps into ON: no VOL worry');
+    ok(CK.run(mk(true), lib).findings.some(f => f.check === 'io.vil'), 'a 1 kΩ pull-up sinks 3.3 mA: VOL matters');
+    const dc = (bulkCond) => CK.run(design([part('U3', 'BB1', 'ic', ['VIN', 'GND']), two('C1', 'capacitor', '10uF'), two('C2', 'capacitor', '10uF')], { '+5V': ['U3.1', 'C1.1', 'C2.1'], GND: ['U3.2', 'C1.2', 'C2.2'] }),
+      [file('BB1', 'ic', [fp(1, 'VIN', 'power-in', 'VIN'), fp(2, 'GND', 'ground')], [{ k: 'dec.c', on: 'VIN', value: 22e-6, unit: 'F', ok: okv }, { k: 'dec.bulk', on: 'VIN', value: 47e-6, unit: 'F', cond: bulkCond, ok: okv }])]);
+    ok(!dc('').findings.some(f => / wanting /.test(f.title)), 'two 10 µF make up 22 µF');
+    eq(has(dc('If the input supply is more than a few centimeters away'), 'parts.decoupling', /less than 47 µF bulk/).severity, 'info', 'conditional bulk is a note');
+    eq(has(dc(''), 'parts.decoupling', /less than 47 µF bulk/).severity, 'warn');
+    const ad = CK.run(design([part('U4', 'GAUGE2', 'ic', ['SDA', 'GND']), part('U5', 'TYPEC1', 'ic', ['SDA', 'ADR', 'GND']), two('R2', 'resistor', '4.7k')],
+      { BUS_SDA: ['U4.1', 'U5.1', 'R2.1'], '+1V8': ['R2.2'], GND: ['U4.2', 'U5.2', 'U5.3'] }),
+      [file('GAUGE2', 'power', [fp(1, 'SDA', 'open-drain'), fp(2, 'GND', 'ground')], [{ k: 'i2c.addr', list: ['I2CSid 0b00 (default, nPackCfg 0x2000): primary 0x36, secondary 0x0B', 'I2CSid 0b01: primary 0x76'], ok: okv }]),
+        file('TYPEC1', 'interface', [fp(1, 'SDA', 'open-drain'), fp(2, 'ADR', 'boot'), fp(3, 'GND', 'ground')], [{ k: 'i2c.addr', list: ['ADR = 10 kΩ to VDD: 0x3D', 'ADR = 10 kΩ to GND: 0x1D'], ok: okv }])]);
+    ok(!ad.findings.some(f => f.check === 'straps.i2c'), 'both addresses worked out, and they differ');
+  });
+
+  t('scan: resets and enables nothing here holds, a strap that becomes an output, a reset held by another board, and a reset-time pull-up', () => {
+    const { part, two, file, fp, design, okv, has } = sb;
+    const d = design([
+      part('U1', 'MCU8', 'ic', ['VDD', 'VSS', 'NRST', 'PA2', 'PB4']), part('U2', 'AMP1', 'ic', ['VDD', 'GND', 'RESET']), part('U3', 'LSW2', 'ic', ['VIN', 'GND', 'ON', 'VOUT']),
+      part('U4', 'TYPEC2', 'ic', ['VDD', 'ADR', 'GND']), part('U5', 'BUF1', 'ic', ['VCC', 'A', 'Y', 'GND']), two('R1', 'resistor', '100k'),
+      part('U6', 'REG18', 'ic', ['VIN', 'GND', 'VOUT']), part('J1', 'FLEX6', 'connector', ['1', '2', '3', '4', '5', '6']), part('J9', 'PWR2', 'connector', ['1', '2'])],
+      { '+5V': ['U6.1', 'J9.1'], '+1V8': ['U6.3', 'U1.1', 'U2.1', 'U3.1', 'U4.1', 'U5.1'], GND: ['U1.2', 'U2.2', 'U3.2', 'U4.3', 'U5.4', 'U6.2', 'J1.5', 'U4.2', 'J9.2'],
+        RST_X: ['U2.3', 'J1.1'], ON_X: ['U1.4', 'U3.3'], NRST: ['U1.3', 'U5.3'], BUF_A: ['U5.2', 'R1.1'], '1V8_EXT': ['R1.2', 'J1.2'],
+        SENS_RST: ['U1.5', 'J1.3'], V1V8_SW: ['U3.4', 'J1.4'] });
+    const lib = [
+      file('MCU8', 'mcu', [fp(1, 'VDD', 'power-in', 'VDD'), fp(2, 'VSS', 'ground'), fp(3, 'NRST', 'reset', 'VDD'), fp(4, 'PA2', 'io', 'VDD'), fp(5, 'PB4', 'io', 'VDD', { reset: 'pull-up', functions: ['NJTRST'] })]),
+      file('AMP1', 'ic', [fp(1, 'VDD', 'power-in', 'VDD'), fp(2, 'GND', 'ground'), fp(3, 'RESET', 'reset', 'VDD')]),
+      file('LSW2', 'switch', [fp(1, 'VIN', 'power-in', 'VIN'), fp(2, 'GND', 'ground'), fp(3, 'ON', 'enable', 'VIN'), fp(4, 'VOUT', 'power-out')], [{ k: 'en.default', text: 'Smart pull-down holds ON low until driven high, then released', ok: okv }]),
+      file('TYPEC2', 'interface', [fp(1, 'VDD', 'power-in', 'VDD'), fp(2, 'ADR', 'boot', 'VDD', { functions: ['ADR strap at power-up', 'CON_DET output after the strap is latched'] }), fp(3, 'GND', 'ground')]),
+      file('BUF1', 'logic', [fp(1, 'VCC', 'power-in', 'VCC'), fp(2, 'A', 'input', 'VCC'), fp(3, 'Y', 'open-drain', 'VCC'), fp(4, 'GND', 'ground')]),
+      file('REG18', 'regulator', [fp(1, 'VIN', 'power-in', 'VIN'), fp(2, 'GND', 'ground'), fp(3, 'VOUT', 'power-out')], [{ k: 'reg.vout', typ: 1.8, unit: 'V', ok: okv }]),
+      file('FLEX6', 'connector', [1, 2, 3, 4, 5, 6].map(n => fp(n, String(n), 'other'))),
+    ];
+    const r = CK.run(d, lib);
+    ok(has(r, 'pins.float', /U2 RESET \(pin 3\) is driven only through J1/, 'warn'), 'reset only from the other board');
+    ok(has(r, 'pins.float', /U3 ON \(pin 3\) floats while U1 is in reset/, 'warn'), 'enable only from an MCU pin, smart pull-down');
+    ok(has(r, 'straps.output', /U4 ADR is tied straight to GND/, 'warn'), 'strap that becomes an output');
+    ok(has(r, 'io.unpowered', /U1 is held in reset whenever 1V8_EXT is off: U5's input is pulled up only to it/, 'warn'), 'reset held by another board\'s rail');
+    ok(has(r, 'io.unpowered', /U1 PB4 pulls up from reset into J1, whose rail V1V8_SW is switched/, 'info'), 'reset-time pull-up into a switched rail');
+  });
+
   // Connectors (docs/connectors.md): a made-up 14-pin debug header with its VCP crossed, and a 20–28 V input.
   const connBoard = () => {
     const pin = (num, name, type) => ({ num, name, type: type || 'passive' });

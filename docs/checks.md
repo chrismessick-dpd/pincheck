@@ -119,3 +119,53 @@ From a run on a real board whose false alarms these fixed:
 - **`supply.tied`** reads "VDDUSB to VDD (or VSS)" as VDDUSB and VDD; what follows "or" is a choice.
 - **A range for when a feature is used** (`cond` "USB used") applies only when the feature is wired: a pin offering it is on
   a net named for it, or meets another part's pin named for it.
+
+## What a Claude scan taught them (2026-11-13)
+
+The first Claude scan of a real board (`docs/claude-scan.md`; ledger `docs/learned.md`, scan `20261113-2223`) turned up
+these, each built as a general rule with a made-up board in `tests/test.js`:
+
+- **0 Ω jumpers are links.** A two- or three-pad part with a value of 0, or described as a 0 Ω jumper, whatever its
+  designator ("Y" made them crystals), joins the pads its description names ("1-2 connected", else 1 and 2) as a 0 Ω
+  resistor does. It needs no part file.
+- **Regulators held off.** An active-high enable on ground, directly or through links, holds a regulator or switch off:
+  it makes no rail, `parts.regulator` says it's fitted for nothing, and its other findings are notes.
+- **Rails as ranges.** A battery input (a power input on the Connectors tab) reaches the system rail through a protector's
+  FETs, and a regulator on the same rail widens its range instead of hiding it. A regulator programmable over I2C
+  (`reg.vout` with a condition saying so, and `reg.vout.range`) carries its maximum with the rail: a load whose maximum is
+  lower gets a `supply.range` warning. An output set by strap resistors comes from `reg.vout.strap`. An eFuse's overvoltage
+  trip (`sw.ovlo` and the divider on its OVLO pin) above a protected load's recommended maximum is a `supply.range` warning.
+- **`supply.offboard`:** a rail that comes only through connectors and feeds loads, no regulator (a note).
+- **`supply.charge`:** a charger (`kind: power` with `reg.vout.range` as its charge voltage) fed from a regulator whose
+  power-up default is below that voltage.
+- **`supply.unpowered`** names the power port a pin is drawn on when nothing else in the design is on it, and the rail the
+  part file's `supply.tied` says to tie it to.
+- **Nets:** `nets.names` (a wire carrying a power port and another name; in a hierarchical design net labels are local, so
+  only power ports count there), `nets.dangling` (a named signal reaching one connector pin and test points, or only one
+  protection part's channel), `nets.pulls` (two pull resistors from one net to one rail).
+- **`parts.fields`:** Value, Comment, and Description that disagree (value or voltage), a value of "?", a footprint size
+  that differs from the package reference, and an IC whose Value names another part.
+- **Pins:** a reset or enable driven only through a connector (not an MCU's), or an enable driven only by MCU pins with no
+  pull that stays on ("smart" pull-downs let go once driven high), is a `pins.float` warning. A strap pin that becomes an
+  output tied straight to a rail is `straps.output`.
+- **`func.i2cpull`:** an I2C bus with no pull-ups; when it leaves through a connector, the window the far board's pull-ups
+  must sit in (the highest VIH to the lowest pin maximum). I2C pins never drive a net high, whatever their file's role.
+- **`func.switch`:** a signal switch that starts open (`sw.default`) with no MCU on its control lines.
+- **`io.unpowered`:** an MCU held in reset by a buffer whose input is pulled up only to a rail from another board; an MCU
+  pin pulled up from reset into a part or connector on a rail a load switch turns on (a note).
+- **`io.vil`** compares a VOL given at a test current only when pull-ups on the net sink a tenth of it: into CMOS inputs
+  the low is millivolts.
+- **`parts.decoupling`** reports the real count and total, lets smaller capacitors make up a microfarad-class value, makes
+  conditional bulk ("if the supply is far away") a note, and says when the bulk (or the capacitor) a part counts is drawn
+  on another sheet.
+- **`parts.regulator`:** an inductor's saturation current (its part file's `l.isat`, or a rating in its description)
+  against `reg.l.isat`, else the switch current limit; unknown, a 0603 or smaller chip inductor is flagged.
+- **`parts.sense`:** the current a gauge or protector measures and protects at (`sense.vfs` over the CSP-CSN resistor).
+- **Connectors, assigned or not:** a debug header carrying SWDIO and SWCLK with no reset (`conn.mate`; an assigned mate's
+  open reset is a warning now); power entering on a connector into an eFuse or regulator with no TVS or capacitor
+  (`power.protection`); an eFuse's current limit (`sw.ilim.k` / RILM, ±10%) above the connector's contacts; a linear
+  regulator's input current over its contacts; speaker, motor, and coil lines on one small contact (`power.contacts`);
+  and the pads of one contact (`contact`) on different nets (`conn.contacts`).
+- **`library.pins`** matches a datasheet's other names (`aliases`, either side of a slash), a port with the board's use
+  after it ("PH0 / UNUSED"), and synonyms (LX and SW, PGND and GND). **`straps.i2c`** reads a strap through a resistor and
+  an address set in memory (the line marked default).

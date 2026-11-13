@@ -111,7 +111,10 @@ async function load(src, variant, o = {}) {
     if (variant && !(design.variants || []).some(v => v.name === variant)) throw new CliError('No variant "' + variant + '". The project has: ' + ((design.variants || []).map(v => v.name).join(', ') || 'none'));
     design.variant = variant; D.applyVariant(design.parts, design.variants || [], variant);
   }
-  const lib = jsonDir(path.join(libDir, 'parts')).concat(o.parts ? jsonDir(o.parts) : []).concat(opt('extra') ? jsonDir(opt('extra')) : []).filter(f => f.schema === L.SCHEMA);
+  // Later sources replace earlier ones by id: --extra files (a scan's new or fixed parts) win over the library's.
+  const byId = new Map();
+  for (const f of jsonDir(path.join(libDir, 'parts')).concat(o.parts ? jsonDir(o.parts) : [], opt('extra') && opt('extra') !== true ? jsonDir(opt('extra')) : [])) if (f.schema === L.SCHEMA) byId.set(f.id, f);
+  const lib = [...byId.values()];
   // Connector assignments and the profiles they name: pincheck_data's, then the repo's standard ones.
   const rec = jsonDir(path.join(libDir, 'designs')).find(r => r.key === L.slug(design.name) || L.slug(r.design || '') === L.slug(design.name));
   const profiles = {};

@@ -59,6 +59,8 @@ differences).
 | `unused` | What the datasheet says to do when unused: `float`, `gnd`, `supply`, `pull`, `must`. |
 | `ext` | An external part the datasheet requires on the pin: `"4.7 µF to GND, ESR < 1 Ω"`. |
 | `vmax`, `absmax` | The pin's own recommended maximum and absolute maximum voltage, where they differ from its domain's `io.absmax` (I2C pins rated 1.98 V on a 3.3 V part, a pin rated BATT+0.3). Numbers in volts or expressions. The checks use these before the domain's. |
+| `aliases` | The datasheet's other names for the pin (a slash-joined pin name, or a name per variant: `["MODE"]` beside `SYNC`). A symbol using any of them matches (2026-11-13). |
+| `contact` | On a connector, which pads are one contact (the two solder tails of a power contact): pads with the same `contact` must be on one net, or the board shorts them through it (`conn.contacts`). Only from the maker's drawing. |
 | `note` | Anything else. |
 
 ## Values

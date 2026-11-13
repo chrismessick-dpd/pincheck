@@ -89,6 +89,12 @@ the suite's hard rules.
   *Download the skills* in Check with Claude and Batch configure zips `skill/` as `.claude/skills/<name>/SKILL.md`
   (`PK.claude.downloadSkills`, a stored zip written in the page). A netlist part now keeps the SchDoc sheets it's drawn on (`design.js`).
 
+- **Self-improve from the first Claude scan (2026-11-13, Chris confirmed all 48 items; not committed):** 40 built into
+  the offline checks (new: `nets.names`, `nets.dangling`, `nets.pulls`, `parts.fields`, `parts.sense`, `supply.offboard`,
+  `supply.charge`, `func.i2cpull`, `func.switch`, `straps.output`, `conn.contacts`; 0 Ω jumpers as links, regulators held
+  off, rail ranges, strapped outputs; catalog `reg.vout.strap`, `sw.ilim.k`, `sw.default`, `sense.vfs`; pin `aliases` and
+  `contact`), 7 ideas in the ledger. See `docs/checks.md`, *What a Claude scan taught them*, and `docs/learned.md`.
+
 ## Rules
 
 - **No client data in this repo.** Not in code, docs, tests, demo, or commit messages. Real projects
@@ -116,7 +122,7 @@ the suite's hard rules.
    change to `model.js` or `github.js`.
 2. `python tools/stamp_version.py`.
 3. Serve the tools folder (preview `signoff-suite-alt`, port 8774) and open `pincheck/tests/test.html`:
-   PASS (45 tests), and `node tests/scan_test.js` (5). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
+   PASS (53 tests), and `node tests/scan_test.js` (5). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
    three sheets.
 4. In the browser pane, scripts are cached: fetch changed files with `{cache: 'reload'}` first. The demo
    library is loaded into IndexedDB `pincheck-demo` once; delete that database to reload it.

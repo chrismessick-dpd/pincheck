@@ -28,7 +28,8 @@
     const pre = (/^[A-Za-z_]+/.exec(p.ref) || [''])[0].toUpperCase();
     const n = p.pins.length;
     if (/^(U|IC|AR|VR|PS|MOD|M)$/.test(pre)) return pre === 'PS' && n <= 2 ? 'other' : 'ic';
-    if (/^(Y|X|XTAL|OSC)$/.test(pre)) return 'crystal';
+    // A "Y" with a value of 0, or described as a 0 Ω jumper, is a link, not a crystal (Chris, 2026-11-13).
+    if (/^(Y|X|XTAL|OSC)$/.test(pre)) return /^\s*0\s*(R|Ω|ohms?)?\s*$/i.test((p.params || {}).Value || (p.params || {}).Comment || '') || /\b0\s*(ohm|Ω)\b|\bjumper\b/i.test((p.params || {}).Description || '') ? 'other' : 'crystal';
     if (/^(J|P|CN|CON|X?CONN|JP|H)$/.test(pre)) return 'connector';
     if (/^(R|RN|RA|RV|NTC|PTC|TH)$/.test(pre)) return 'resistor';
     if (/^(C|CP)$/.test(pre)) return 'capacitor';

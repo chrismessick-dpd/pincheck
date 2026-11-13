@@ -58,6 +58,16 @@ time, each given this skill's steps and its one entry. Report every part at the 
   BATT+0.3 V) gets `vmax` (recommended maximum) and `absmax` (absolute maximum) on the pin, never an
   `x.` key, so the checks see it; `unused: "must"` means it must be driven or tied (no internal pull), `pull` means a resistor is
   recommended.
+- **Other pin names** the datasheet gives (a slash-joined name like "SYNC/MODE", or a name per variant) go in the pin's
+  `aliases` list, so a symbol using either matches. On a connector, pads that are one contact (a power contact's two solder
+  tails) get the same `contact` value, but only when the maker's drawing numbers them; otherwise say so in the pin's note.
+- **Keys the checks read since 2026-11-13** (from a Claude scan of a real board), filled whenever the datasheet states them:
+  `reg.vout.strap` for an output set by strap resistors (one line per setting: `"SEL = high, CFG1 = 36.5 kΩ, CFG2 = 0 Ω |
+  511 Ω: 3.3 V"`, every row of the table, read as page images); `reg.vout`'s `cond` saying "set by I2C" when the output is
+  programmable, with `reg.vout.range`; `sw.ilim.k` (the k in ILIM = k / RILM); `sw.default` for a signal switch or mux (open
+  or closed at power-up, and what closes it); `sense.vfs` for a gauge or protector (the sense voltage at full scale across
+  CSP and CSN); and a charger's charge voltage range in `reg.vout.range`. I2C pins (SDA, SCL) are `open-drain` or `input`,
+  never `io` or `output`.
 - If a value depends on the ordering code (temperature grade, output voltage option), fill it for
   **this** part number and say so in `cond`.
 - Keep American English and the serial comma in notes.

@@ -101,6 +101,7 @@
     { k: 'reg.vout', label: 'Output voltage (fixed parts)', unit: 'V', shape: 'range', on: 'part' },
     { k: 'reg.vref', label: 'Feedback reference', unit: 'V', shape: 'range', on: 'part', hint: 'Adjustable parts: Vout = Vref × (1 + Rtop/Rbottom) from the divider on the FB pin. Fill it for fixed parts too when stated' },
     { k: 'reg.vout.range', label: 'Adjustable output range', unit: 'V', shape: 'range', on: 'part' },
+    { k: 'reg.vout.strap', label: 'Output set by strap resistors', unit: '', shape: 'list', on: 'part', hint: 'One line per setting, the pins\' resistors to GND then the output: "CFG1 = 36.5 kΩ, CFG2 = 0 Ω: 3.3 V". A pin may be high, low, or open: "SEL = high". Pincheck picks the line the board matches (within 3%)' },
     { k: 'reg.iout', label: 'Output current, rated', unit: 'A', shape: 'value', on: 'part' },
     { k: 'reg.ilim', label: 'Current limit (switch or output)', unit: 'A', shape: 'range', on: 'part' },
     { k: 'reg.dropout', label: 'Dropout at rated current', unit: 'V', shape: 'value', on: 'part' },
@@ -120,11 +121,16 @@
     { k: 'reg.pg', label: 'Power good output type', unit: '', shape: 'text', on: 'part', hint: 'Open drain needs a pull-up' },
     { k: 'reg.vfb.absmax', label: 'FB pin absolute maximum', unit: 'V', shape: 'value', on: 'part' }
   ]);
+  add('Current sense', ['power', 'analog', 'sensor', 'switch', 'regulator'], [
+    { k: 'sense.vfs', label: 'Current-sense full scale', unit: 'V', shape: 'value', on: 'part', hint: 'The sense voltage at full scale (or the protection threshold) across the resistor on CSP and CSN; Pincheck divides it by the resistor' }
+  ]);
   add('Switch or protection', ['switch', 'power', 'driver', 'logic', 'analog'], [
     { k: 'sw.vin', label: 'Input range', unit: 'V', shape: 'range', on: 'part' },
     { k: 'sw.ron', label: 'On resistance', unit: 'Ω', shape: 'range', on: 'part' },
     { k: 'sw.iout', label: 'Continuous current, maximum', unit: 'A', shape: 'value', on: 'part' },
     { k: 'sw.ilim', label: 'Current limit (set or fixed)', unit: 'A', shape: 'range', on: 'part', hint: 'With the formula for its setting resistor in the note' },
+    { k: 'sw.ilim.k', label: 'Current limit setting constant', unit: 'V', shape: 'value', on: 'part', hint: 'k in ILIM (A) = k / RILM (Ω), for a limit set by a resistor on ILM, ILIM, or ISET to ground (one eFuse family uses 3334)' },
+    { k: 'sw.default', label: 'Switch state at power-up', unit: '', shape: 'text', on: 'part', hint: 'For signal switches and muxes: open or closed after power-on, and what closes it ("open; closed by writing register 00h over I2C")' },
     { k: 'sw.ovlo', label: 'Over- and undervoltage thresholds', unit: 'V', shape: 'range', on: 'part' },
     { k: 'sw.rise', label: 'Output rise time', unit: 's', shape: 'range', on: 'part' }
   ]);

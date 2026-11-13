@@ -117,6 +117,28 @@
   }
 
   // Do the file's pins agree with the schematic symbol's? Mismatches name the pin number.
+  // One pin, two names (from a real board, 2026-11-13): a datasheet's other name for it (the file's `aliases`, or
+  // either side of a slash, "SYNC/MODE"), the port with the board's use after it ("PH0 / UNUSED" for PH0-OSC_IN),
+  // and the usual synonyms (LX and SW, PGND and GND, OUT and VOUT).
+  const SYN = { LX: 'SW', PH: 'SW', SWN: 'SW', VSS: 'GND', PGND: 'GND', AGND: 'GND', DGND: 'GND', GNDA: 'GND', GNDP: 'GND', EP: 'PAD', EPAD: 'PAD', VOUT: 'OUT', VIN: 'IN', VCC: 'VDD' };
+  function nameTokens(s) {
+    const out = new Set();
+    for (const part of String(s || '').toUpperCase().split(/\s*\/\s*/)) {
+      const whole = part.replace(/[^A-Z0-9]/g, ''), lead = (/^[A-Z0-9]+/.exec(part.replace(/^[^A-Z0-9]+/, '')) || [''])[0];
+      for (const t of [whole, lead]) {
+        if (!t) continue;
+        out.add(t);
+        const m = /^([A-Z]+)(\d*)$/.exec(t);
+        if (m && SYN[m[1]]) out.add(SYN[m[1]] + m[2]);
+      }
+    }
+    return out;
+  }
+  function sameName(schName, filePin) {
+    const a = nameTokens(schName);
+    return [filePin.name].concat(filePin.aliases || []).some(n => [...nameTokens(n)].some(t => a.has(t)));
+  }
+
   function pinCheck(file, part) {
     const out = [];
     const fp = new Map(file.pins.map(p => [String(p.num).toUpperCase(), p]));
@@ -125,7 +147,7 @@
       const f = fp.get(String(p.num).toUpperCase());
       if (!f) { out.push({ num: p.num, sch: p.name, file: null }); continue; }
       const a = clean(p.name), b = clean(f.name);
-      if (a && b && a !== b && !a.includes(b) && !b.includes(a)) out.push({ num: p.num, sch: p.name, file: f.name });
+      if (a && b && a !== b && !a.includes(b) && !b.includes(a) && !sameName(p.name, f)) out.push({ num: p.num, sch: p.name, file: f.name });
     }
     const sp = new Set(part.pins.map(p => String(p.num).toUpperCase()));
     for (const f of file.pins) if (!sp.has(String(f.num).toUpperCase())) out.push({ num: f.num, sch: null, file: f.name });
