@@ -81,7 +81,8 @@ MCUs. The checks are general: any input driven by another part's output.
   Sources not found: a warning.
 - **Parts not fitted leave the checks** (`fitted()`): an Altium variant's not-fitted list (`.PrjPcb` or
   `.PrjPcbVariants`, the project's current variant; `design.js` `parseVariants`), or the part's own DNP parameter or
-  comment. Overview and Findings show the build variant being checked under the design's name, with a picker of the
+  comment. Overview and Findings show the build variant being checked as `· <variant>` under a *Build variant* label, after the design's name on
+  the title's line (on the line under it when narrow, so the scan panel keeps its room), with a picker of the
   project's variants (and *No variant*) when it has any; picking one marks its parts and checks again (Chris, 2026-11-13).
   The demo's project has two: Development fits everything, Production leaves the debug header J5 off.
 

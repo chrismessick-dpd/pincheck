@@ -459,7 +459,17 @@
   }
   const ago = t => { const s = Math.round((Date.now() - t) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : Math.round(s / 3600) + ' h ago'; };
 
-  function renderView() { drawView(); syncInspector(); }
+  function renderView() { drawView(); syncInspector(); fitVariant(); }
+  // The build variant picker (findings.js variantBar) as wide as the chosen name, so its caret sits beside it.
+  function fitVariant() {
+    const s = document.querySelector('#view .pk-variant-sel'); if (!s || !s.selectedOptions[0]) return;
+    const c = (fitVariant.c = fitVariant.c || document.createElement('canvas').getContext('2d'));
+    const cs = getComputedStyle(s); c.font = cs.font;
+    s.style.width = Math.ceil(c.measureText(s.selectedOptions[0].text).width + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + 2) + 'px';
+  }
+  // Its font size changes with the window (smaller when narrow), and the display font may arrive after the first draw.
+  window.addEventListener('resize', fitVariant);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitVariant);
 
   function openReport() {
     const d = active(); if (!d) return;
