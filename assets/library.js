@@ -138,6 +138,21 @@
     return { values: v.length, verified: ok, pins: file.pins.length, roles: file.pins.filter(p => p.role && p.role !== 'other').length };
   }
 
+  // Whether a person has gone through the file (Chris, 2026-11-13). A file without `status` is imported.
+  const STATUSES = { imported: 'Imported', checked: 'Checked' };
+  const status = f => (STATUSES[f && f.status] ? f.status : 'imported');
+
+  // "Made by llm (pincheck-part skill), 2026-11-13" / "Made from schematic by @someone, …".
+  function madeLine(f) {
+    const m = (f && f.made) || {};
+    const how = String(m.how || '').trim(), by = String(m.by || '').trim();
+    let s;
+    if (/^llm\b/i.test(how)) s = 'Made by llm' + (by ? ' (' + by + ')' : '');
+    else if (/^by /i.test(how)) s = 'Made ' + how + (by ? ' (' + by + ')' : '');
+    else s = 'Made' + (how ? ' ' + how : '') + (by ? ' by ' + by : '');
+    return s + (m.at ? ', ' + String(m.at).slice(0, 10) : '');
+  }
+
   // Check a file someone made or edited (by hand or with the Claude skill): the shape, the keys,
   // the units. Returns problems as text; empty means fine.
   function validate(file) {
@@ -249,5 +264,5 @@
     await del(f.id);
   }
 
-  PK.library = { SCHEMA, REPO, norm, slug, glob, guessKind, guessRole, domainOf, fromSchematic, find, near, pinCheck, stats, validate, all, put, save, remove, meta, sync, dump, strip, token };
+  PK.library = { SCHEMA, REPO, norm, slug, glob, guessKind, guessRole, domainOf, fromSchematic, find, near, pinCheck, stats, STATUSES, status, madeLine, validate, all, put, save, remove, meta, sync, dump, strip, token, gh, b64 };
 })(typeof window !== 'undefined' ? (window.PK = window.PK || {}) : (globalThis.PK = globalThis.PK || {}));

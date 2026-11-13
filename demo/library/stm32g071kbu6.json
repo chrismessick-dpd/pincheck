@@ -83,13 +83,23 @@
       "num": "9",
       "name": "PA2",
       "role": "io",
-      "domain": "VDD"
+      "domain": "VDD",
+      "functions": [
+        "ADC1_IN2",
+        "USART2_TX AF1",
+        "EXTI2"
+      ]
     },
     {
       "num": "10",
       "name": "PA3",
       "role": "io",
-      "domain": "VDD"
+      "domain": "VDD",
+      "functions": [
+        "ADC1_IN3",
+        "USART2_RX AF1",
+        "EXTI3"
+      ]
     },
     {
       "num": "11",

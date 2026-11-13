@@ -372,3 +372,21 @@ body.pk-dragging .pk-dropzone { display: grid; }
 .paper .pk-sev { min-width: 0; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .paper .pk-mono { word-break: break-word; }
 .paper h2 + .r-cmt { margin: -4px 0 8px; }
+
+/* Connectors (assets/app.js connectorsPage, docs/connectors.md) */
+.pk-cn td { vertical-align: top; }
+.pk-cn-sel { min-width: 210px; max-width: 100%; }
+.pk-cn-detail > td { border-top: 0; padding-top: 0; }
+.pk-cn-pins { margin: 2px 0 8px; font-size: 12.5px; }
+.pk-cn-pins td, .pk-cn-pins th { padding: 5px 8px; }
+.pk-cn-src { margin: 4px 0 8px; line-height: 1.5; }
+.pk-cn-f { display: flex; gap: 6px; align-items: baseline; margin: 3px 0; font-size: 12.5px; }
+.pk-cn-sev { display: inline-block; min-width: 18px; text-align: center; border-radius: 4px; font-weight: 700; font-size: 11px; padding: 0 3px; }
+.pk-cn-error .pk-cn-sev { color: var(--issue); background: var(--issue-hatch), var(--issue-soft); }
+.pk-cn-warn .pk-cn-sev { color: var(--text); background: var(--warn-hatch), var(--warn-soft); box-shadow: inset 0 0 0 1px var(--warn); }
+.pk-cn-info .pk-cn-sev { color: var(--text-3); background: var(--surface-2, transparent); }
+.pk-cn-f .pk-link { text-align: left; }
+.pk-cn-power { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin: 2px 0 8px; font-size: 12.5px; }
+.pk-cn-power label { display: flex; gap: 6px; align-items: center; }
+.pk-cn-num { width: 64px; }
+.pk-cn-pins-in { width: 110px; }

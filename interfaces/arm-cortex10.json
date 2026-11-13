@@ -1,0 +1,24 @@
+{
+  "schema": "pincheck.mate/1",
+  "id": "arm-cortex10",
+  "name": "Arm Cortex 10-pin (CoreSight 10)",
+  "kind": "debug",
+  "mates": "A JTAG or SWD probe's 10-way 1.27 mm (0.05 in) ribbon cable, into the CoreSight 10 (Cortex Debug) header on the target, typically a Samtec FTSH-105 style 2×5 header.",
+  "connector": "2×5, 1.27 mm (0.05 in) pitch, pin 7 keyed",
+  "numbering": "Pins 1 to 10 as on a 2-row header: odd pins in one row, even pins in the other, pin 1 at one end. Pin 7 is the key position and must not be fitted on the target connector. Arm's text gives only the table (the figure is an image); the 1.27 mm pitch and FTSH-105 style are from Tag-Connect's TC2030-CTX datasheet, not from these Arm pages. Tag-Connect's TC2050 footprint numbers the same signals differently (see tc2050-swd).",
+  "source": { "title": "Arm DS-5 Arm DSTREAM System and Interface Design Reference Guide, version 5.29: CoreSight 10 pinouts, Table 2-12 CoreSight 10 interface pinout table, and Table 2-13 CoreSight 10 signals (web edition, no page numbers)", "doc": "100956", "rev": "5.29", "url": "https://developer.arm.com/documentation/100956/0529/Arm-DSTREAM-Target-Interface-Connections/The-CoreSight-10-connector-pinouts-and-interface-signals/CoreSight-10-pinouts", "page": null },
+  "pins": [
+    { "num": "1", "signal": "VTREF", "expect": "vref", "required": true, "page": null, "note": "Table 2-13: supplies the probe with the target's debug rail voltage to match its I/O levels. It can be tied high on the target; if pulled high by a resistor, the resistor must be no greater than 100 Ω." },
+    { "num": "2", "signal": "TMS/SWDIO", "expect": ["swdio", "tms"], "required": true, "page": null, "note": "Table 2-13 advises series-terminating SWDIO close to the target processor." },
+    { "num": "3", "signal": "GND", "expect": "gnd", "required": true, "page": null },
+    { "num": "4", "signal": "TCK/SWCLK", "expect": ["swclk", "tck"], "required": true, "page": null },
+    { "num": "5", "signal": "GND", "expect": "gnd", "required": true, "page": null },
+    { "num": "6", "signal": "TDO/SWO", "expect": ["swo", "tdo"], "required": false, "page": null, "note": "Table 2-13 advises series-terminating SWO and TDO close to the target processor." },
+    { "num": "7", "signal": "KEY (NC)", "expect": "key", "required": false, "page": null, "note": "Table 2-13: this pin must not be present on the target connector. ST's STDC14 (pin 9) and Tag-Connect's TC2030-CTX and TC2050-ARM2010 datasheets put RTCK at this position instead." },
+    { "num": "8", "signal": "TDI", "expect": "tdi", "required": false, "page": null, "note": "JTAG only; not used in SWD mode." },
+    { "num": "9", "signal": "GND", "expect": "gnd", "required": true, "page": null, "note": "ST (STDC14 pin 11) and Tag-Connect call this position GNDDetect." },
+    { "num": "10", "signal": "nSRST", "expect": "nrst", "required": false, "page": null, "note": "Table 2-13: system reset, driven by the probe or the target; typically pulled high on the target." }
+  ],
+  "status": "imported",
+  "made": { "by": "llm (research agent)", "at": "2026-11-13T21:39:40Z", "how": "from the maker's documents" }
+}

@@ -187,6 +187,7 @@
   ]);
   add('Digital I/O', ICS, [
     { k: 'io.absmin', label: 'Absolute minimum on an I/O pin', unit: 'V', shape: 'value', on: 'domain', hint: 'Usually −0.3 V' },
+    { k: 'io.absmax.off', label: 'Absolute maximum on an I/O pin while the part is unpowered', unit: 'V', shape: 'value', on: 'domain', hint: 'Only when the datasheet states it apart from the usual maximum; otherwise the checks evaluate io.absmax or io.ft.absmax with the supplies at 0 V' },
     { k: 'io.cload', label: 'Load capacitance, maximum', unit: 'F', shape: 'value', on: 'part' },
     { k: 'io.failsafe', label: 'Inputs safe when unpowered (fail-safe)', unit: '', shape: 'text', on: 'part', hint: 'Which pins tolerate a voltage with the part unpowered' }
   ]);

@@ -1,0 +1,28 @@
+{
+  "schema": "pincheck.mate/1",
+  "id": "st-stdc14",
+  "name": "ST STDC14 (STLINK-V3)",
+  "kind": "debug",
+  "mates": "An STLINK-V3 probe (STLINK-V3SET, STLINK-V3MINIE, and others) through its 14-wire STDC14 flat cable, into a 2×7 1.27 mm (0.05 in) header on the target such as Samtec FTSH-107-01-L-DV-K-A.",
+  "connector": "2×7, 1.27 mm (0.05 in) pitch, keyed (Samtec FTSH-107-01-L-DV-K-A on the probe)",
+  "numbering": "Pins 1 to 14 as on a 2-row FTSH header: odd pins in one row, even pins in the other, pin 1 at the key. UM2448 says pins 3 to 12 follow the Arm 10-pin Cortex debug pinout, so STDC14 pin n is Cortex 10-pin pin n−2. The manual's text gives the table only; check the header's own drawing for which row is which.",
+  "source": { "title": "UM2448 User manual, STLINK-V3SET debugger/programmer for STM8 and STM32, Table 6. STDC14 connector (CN1) pinout", "doc": "UM2448", "rev": "Rev 9", "url": "https://www.st.com/resource/en/user_manual/um2448-stlinkv3set-debuggerprogrammer-for-stm8-and-stm32-stmicroelectronics.pdf", "page": 24 },
+  "pins": [
+    { "num": "1", "signal": "Reserved", "expect": "nc", "required": false, "page": 24, "note": "Footnote 1: do not connect to the target." },
+    { "num": "2", "signal": "Reserved", "expect": "nc", "required": false, "page": 24, "note": "Footnote 1: do not connect to the target." },
+    { "num": "3", "signal": "T_VCC", "expect": "vref", "required": true, "page": 24, "note": "Footnote 2: input for STLINK-V3SET. The probe senses the target's I/O supply here; it does not power the target." },
+    { "num": "4", "signal": "T_JTMS/T_SWDIO", "expect": ["swdio", "tms"], "required": true, "page": 24 },
+    { "num": "5", "signal": "GND", "expect": "gnd", "required": true, "page": 24 },
+    { "num": "6", "signal": "T_JCLK/T_SWCLK", "expect": ["swclk", "tck"], "required": true, "page": 24 },
+    { "num": "7", "signal": "GND", "expect": "gnd", "required": true, "page": 24 },
+    { "num": "8", "signal": "T_JTDO/T_SWO", "expect": ["swo", "tdo"], "required": false, "page": 24, "note": "Footnote 3: SWO is optional, required only for Serial Wire Viewer (SWV) trace." },
+    { "num": "9", "signal": "T_JRCLK/NC", "expect": "other", "required": false, "page": 24, "note": "JTAG return clock. Footnote 4: optional loopback of T_JCLK on the target side, required if the loopback is removed on the STLINK-V3SET side. Footnote 5: NC means not required for SWD." },
+    { "num": "10", "signal": "T_JTDI/NC", "expect": "tdi", "required": false, "page": 24, "note": "Footnote 5: NC means not required for the SWD connection." },
+    { "num": "11", "signal": "GNDDetect", "expect": "other", "required": false, "page": 24, "note": "Footnote 6: tied to GND by STLINK-V3SET firmware; the target may use it to detect the tool. Ground it or wire it to a detect input." },
+    { "num": "12", "signal": "T_NRST", "expect": "nrst", "required": false, "page": 24 },
+    { "num": "13", "signal": "T_VCP_RX", "expect": "uart-rx", "required": false, "page": 24, "note": "The target's UART RX input goes here. Footnote 7: output for STLINK-V3SET; section 7.4.4 (page 20): T_VCP_RX is the Rx for the target (Tx for the STLINK-V3SET)." },
+    { "num": "14", "signal": "T_VCP_TX", "expect": "uart-tx", "required": false, "page": 24, "note": "The target's UART TX output goes here. Footnote 2: input for STLINK-V3SET; section 7.4.4 (page 20): T_VCP_TX is the Tx for the target (Rx for the STLINK-V3SET). Table 8 (the CN3 Virtual COM port connector) says the same: must be connected to UART_TX on target." }
+  ],
+  "status": "imported",
+  "made": { "by": "llm (research agent)", "at": "2026-11-13T21:39:40Z", "how": "from the maker's documents" }
+}

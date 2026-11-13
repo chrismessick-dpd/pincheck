@@ -1,0 +1,10 @@
+{
+  "schema": "pincheck.connectors/1",
+  "id": "main-pcba-dt-1042-rev-b",
+  "design": "Main PCBA (DT-1042 rev B)",
+  "connectors": [
+    { "ref": "J3", "power": { "pins": ["A4", "B4"], "return": ["A1", "B1"], "v": { "min": 4.75, "typ": 5, "max": 5.25 }, "i": 1.5 }, "by": "@demo-reviewer", "at": "2026-11-13T15:00:00Z" },
+    { "ref": "J5", "mate": "st-stdc14", "by": "@demo-reviewer", "at": "2026-11-13T15:00:00Z" }
+  ],
+  "updated": "2026-11-13T15:00:00Z"
+}

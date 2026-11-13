@@ -2,7 +2,7 @@
 // in, stored with the board's Signoff EE review, as Fabcheck stores its runs (../pcb_dfm/assets/repo.js).
 //
 //   <dataPath>pincheck/<projectId>/runs/<runId>.json         { run, findings }
-//   <dataPath>pincheck/<projectId>/designs/<key>.json.gz     gzip of { v: 1, design, library }
+//   <dataPath>pincheck/<projectId>/designs/<key>.json.gz     gzip of { v: 1, design, library, connectors? }
 //
 // The bundle is the design as read (parts, nets, sheet drawings) and the part files it was checked against,
 // so a reopened run is the same run. Pincheck only writes to a review's repo; Signoff EE reads a run back
@@ -29,7 +29,7 @@
     return [...out.values()].sort((a, b) => a.id.localeCompare(b.id));
   }
   // The design as stored: what reading the files gave, not what the app added since (its run, scan state).
-  const DESIGN_KEYS = ['name', 'source', 'netlist', 'sheets', 'parts', 'nets', 'notes', 'drawings'];
+  const DESIGN_KEYS = ['name', 'source', 'netlist', 'sheets', 'parts', 'nets', 'notes', 'drawings', 'variants', 'variant'];
   function designOf(d) { const o = {}; for (const k of DESIGN_KEYS) o[k] = d[k] == null ? null : d[k]; return o; }
   // Findings as stored: the contract's fields, with the waiver as sent.
   function compact(findings) {
@@ -41,7 +41,9 @@
   // A run record and its bundle for the open design. Resolves { run, findings, bundle: Uint8Array (gzip) }.
   async function make(d, lib, by) {
     const library = libraryUsed(d, lib);
-    const json = new TextEncoder().encode(JSON.stringify({ v: 1, design: designOf(d), library }));
+    // The connector assignments and mate profiles it was checked with (docs/connectors.md), when any.
+    const connectors = PK.mates ? PK.mates.used(d) : null;
+    const json = new TextEncoder().encode(JSON.stringify(Object.assign({ v: 1, design: designOf(d), library }, connectors ? { connectors } : {})));
     const key = (await sha256(json)).slice(0, 16);
     const bundle = await gzip(json);
     const findings = compact(d.run.findings);
@@ -61,7 +63,7 @@
   async function open(bundle) {
     const b = JSON.parse(new TextDecoder().decode(await gunzip(bundle)));
     if (!b || b.v !== 1 || !b.design || !Array.isArray(b.design.parts)) throw new Error('not a Pincheck run');
-    return { design: b.design, library: Array.isArray(b.library) ? b.library : [] };
+    return { design: b.design, library: Array.isArray(b.library) ? b.library : [], connectors: b.connectors && Array.isArray(b.connectors.assign) ? b.connectors : null };
   }
 
   // ── Runs kept in this browser: every sent run, so Signoff's links find it here (the demo's only way) ──

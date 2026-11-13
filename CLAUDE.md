@@ -19,6 +19,12 @@ the suite's hard rules.
   stored fab packages. Datasheets are in `C:\Dovetail\datasheets` (downloaded from the makers' sites at Chris's
   OK). Not filled (no official datasheet reached): ROHM LMR1901YG-M, 3PEAK TPT75176A, PUI SMT-0827-S-HT-R, and
   NDK MU00525; two crystal symbols name no part number (`WE-XTAL_CFPX-180`, `WE-XTAL_IQXC-42`).
+  Then (2026-11-13, Chris) a main board's batch of 10 (7 Hirose BM23FR, BM23PF, and DF65 connectors, PI3USB9201,
+  MAX98388, and TPS631013) was filled and committed straight to `pincheck_data` (`36bead4`, additive, read back), each
+  with `status: "imported"`.
+- **Status and the made line (2026-11-13, Chris; not committed):** a file's `status` is `imported` (an LLM or a
+  library brought it in) or `checked` (a person went through it), set in the Identity tab (`L.STATUSES`, `L.status`;
+  missing counts as imported). The Identity tab's foot reads "Made by llm (pincheck-part skill), …" (`L.madeLine`).
 - **Checks (2026-11-13, Chris: all of them, Fabcheck-style pages, no check matrix):** `assets/checks.js`
   (23 checks in six groups, net voltages from regulators and dividers) and `assets/findings.js` (Overview,
   Findings). Contract: `docs/checks.md`. Blind run on a real Altium project (local only) found reversed
@@ -57,6 +63,19 @@ the suite's hard rules.
   toolbar's Report on a design opens `PK.pages.report` in `#report`, printed by `suite.css`. See `docs/design.md`,
   *The report*.
 
+- **Connectors (2026-11-13, Chris: a real board's UART reached its ST-LINK header, but not on the VCP pins; not committed):**
+  a Connectors tab sets what mates with each connector, per design: a mate profile (`pincheck.mate/1`, the standard
+  ones in `interfaces/`, from the makers' documents) or a power input (pins, voltage range, current). Checks
+  `conn.mate` and `power.*` (`connectorChecks` in `checks.js`); a power input sets its rail's range. Stored by
+  `assets/mates.js` (its own IndexedDB `pincheck-mates`, synced to `pincheck_data/interfaces/` and `designs/`) and
+  carried in a sent run's bundle. Everything is in `docs/connectors.md`. The LLM only makes profiles (the skill's
+  last section); Pincheck compares.
+- **Logic levels between parts (2026-11-13, Chris: a 5 V transceiver logic side on 3.3 V MCUs, found by a blind run;
+  not committed):** series resistors up to 1 kΩ join a signal (`seriesLinks`, `logicNode`), `io.vih` and the new `io.vil`
+  use each side's own supply, `io.unpowered` traces rails to their sources (`railRoot`, `independent`), and parts not
+  fitted (Altium variants, DNP) leave the checks. New catalog key `io.absmax.off`. See `docs/checks.md`, *Logic levels
+  between parts*.
+
 ## Rules
 
 - **No client data in this repo.** Not in code, docs, tests, demo, or commit messages. Real projects
@@ -82,7 +101,7 @@ the suite's hard rules.
    change to `model.js` or `github.js`.
 2. `python tools/stamp_version.py`.
 3. Serve the tools folder (preview `signoff-suite-alt`, port 8774) and open `pincheck/tests/test.html`:
-   PASS (41 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
+   PASS (45 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
    three sheets.
 4. In the browser pane, scripts are cached: fetch changed files with `{cache: 'reload'}` first. The demo
    library is loaded into IndexedDB `pincheck-demo` once; delete that database to reload it.

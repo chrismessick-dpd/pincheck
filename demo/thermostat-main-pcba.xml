@@ -392,6 +392,16 @@
       <libsource lib="thermostat" part="R" description="RES SMD 1k 1% 1/16W 0402"/>
       <sheetpath names="/" tstamps="/"/>
     </comp>
+    <comp ref="J5">
+      <value>FTSH-107-01-L-DV-K-A</value>
+      <footprint>Connector_PinHeader_1.27mm:PinHeader_2x07_P1.27mm_Vertical_SMD</footprint>
+      <fields>
+        <field name="MPN">FTSH-107-01-L-DV-K-A</field>
+        <field name="Manufacturer">Samtec</field>
+      </fields>
+      <libsource lib="thermostat" part="Conn_02x07_Odd_Even" description="CONN HEADER SMD 14POS 1.27MM"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
   </components>
   <libparts>
     <libpart lib="thermostat" part="TerminalBlock_2">
@@ -632,6 +642,25 @@
         <pin num="2" name="A" type="passive"/>
       </pins>
     </libpart>
+    <libpart lib="thermostat" part="Conn_02x07_Odd_Even">
+      <description>CONN HEADER SMD 14POS 1.27MM</description>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+        <pin num="3" name="3" type="passive"/>
+        <pin num="4" name="4" type="passive"/>
+        <pin num="5" name="5" type="passive"/>
+        <pin num="6" name="6" type="passive"/>
+        <pin num="7" name="7" type="passive"/>
+        <pin num="8" name="8" type="passive"/>
+        <pin num="9" name="9" type="passive"/>
+        <pin num="10" name="10" type="passive"/>
+        <pin num="11" name="11" type="passive"/>
+        <pin num="12" name="12" type="passive"/>
+        <pin num="13" name="13" type="passive"/>
+        <pin num="14" name="14" type="passive"/>
+      </pins>
+    </libpart>
   </libparts>
   <nets>
     <net code="1" name="/AC_L">
@@ -685,6 +714,9 @@
       <node ref="J2" pin="24" pinfunction="24" pintype="passive"/>
       <node ref="D3" pin="1" pinfunction="K" pintype="passive"/>
       <node ref="D4" pin="1" pinfunction="K" pintype="passive"/>
+      <node ref="J5" pin="5" pinfunction="5" pintype="passive"/>
+      <node ref="J5" pin="7" pinfunction="7" pintype="passive"/>
+      <node ref="J5" pin="11" pinfunction="11" pintype="passive"/>
       <node ref="U1" pin="1" pinfunction="GND" pintype="power_in"/>
       <node ref="U1" pin="2" pinfunction="GND" pintype="power_in"/>
       <node ref="U1" pin="11" pinfunction="GND" pintype="power_in"/>
@@ -738,6 +770,7 @@
       <node ref="R13" pin="1" pinfunction="1" pintype="passive"/>
       <node ref="J2" pin="2" pinfunction="2" pintype="passive"/>
       <node ref="J2" pin="3" pinfunction="3" pintype="passive"/>
+      <node ref="J5" pin="3" pinfunction="3" pintype="passive"/>
     </net>
     <net code="9" name="/SW">
       <node ref="U7" pin="2" pinfunction="SW" pintype="power_out"/>
@@ -831,12 +864,23 @@
     </net>
     <net code="30" name="/NRST">
       <node ref="U4" pin="6" pinfunction="PF2-NRST" pintype="bidirectional"/>
+      <node ref="J5" pin="12" pinfunction="12" pintype="passive"/>
     </net>
     <net code="31" name="/SWDIO">
       <node ref="U4" pin="24" pinfunction="PA13" pintype="bidirectional"/>
+      <node ref="J5" pin="4" pinfunction="4" pintype="passive"/>
     </net>
     <net code="32" name="/SWCLK">
       <node ref="U4" pin="25" pinfunction="PA14-BOOT0" pintype="bidirectional"/>
+      <node ref="J5" pin="6" pinfunction="6" pintype="passive"/>
+    </net>
+    <net code="33" name="/T_VCP_RX">
+      <node ref="U4" pin="9" pinfunction="PA2" pintype="bidirectional"/>
+      <node ref="J5" pin="13" pinfunction="13" pintype="passive"/>
+    </net>
+    <net code="34" name="/T_VCP_TX">
+      <node ref="U4" pin="10" pinfunction="PA3" pintype="bidirectional"/>
+      <node ref="J5" pin="14" pinfunction="14" pintype="passive"/>
     </net>
   </nets>
 </export>

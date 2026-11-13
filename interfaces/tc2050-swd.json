@@ -1,0 +1,24 @@
+{
+  "schema": "pincheck.mate/1",
+  "id": "tc2050-swd",
+  "name": "Tag-Connect TC2050 (Arm 10-pin SWD/JTAG)",
+  "kind": "debug",
+  "mates": "A Tag-Connect TC2050-IDC cable through the TC2050-ARM2010 adapter on a probe's 20-pin Arm JTAG header (or the TC2050-IDC-050 cable straight into a 10-pin Cortex connector), pressed onto a TC2050 pad footprint on the target (no header fitted).",
+  "connector": "TC2050 footprint: 10 contact pads in 2 rows of 5 at 1.27 mm (0.05 in) pitch, with alignment holes (and leg latch holes for the legged cable)",
+  "numbering": "From the TC2050-IDC footprint drawing (Rev A): pads 1 to 5 along one row and 6 to 10 back along the other, pad 10 beside pad 1 and pad 6 beside pad 5 (around the footprint, like an IC), not odd and even rows like a 2×5 header. Pad n carries Cortex 10-pin header pin n's signal (the TC2050-IDC-050 cable is wired 1 to 1), so the schematic symbol must use Tag-Connect's pad numbers.",
+  "source": { "title": "TC2050-ARM2010 ARM 20-pin to TC2050 Adapter (1-page datasheet, no revision printed; PDF modified 2020-10-27)", "doc": "TC2050-ARM2010", "rev": null, "url": "https://www.tag-connect.com/wp-content/uploads/bsk-pdf-manager/2021/02/TC2050-ARM2010-2021.pdf", "page": 1 },
+  "pins": [
+    { "num": "1", "signal": "VCC", "expect": "vref", "required": true, "page": 1, "note": "The 20-pin Arm header's pin 1 (VTref): the probe senses the target's I/O supply here." },
+    { "num": "2", "signal": "TMS (JTAG) / SWDIO (SWD)", "expect": ["swdio", "tms"], "required": true, "page": 1 },
+    { "num": "3", "signal": "GND", "expect": "gnd", "required": true, "page": 1 },
+    { "num": "4", "signal": "TCK (JTAG) / SWCLK (SWD)", "expect": ["swclk", "tck"], "required": true, "page": 1 },
+    { "num": "5", "signal": "GND/+5V", "expect": ["gnd", "power-in"], "v": 5, "required": false, "page": 1, "note": "A solder bridge on the ARM2010 adapter selects GND or the debugger's +5 V here (some debuggers, for example ST-LINK/V2, give +3.3 V). A target that grounds this pad shorts the probe's supply when the bridge selects power. The TC2050-IDC-050 cable leaves pads 5 and 9 unconnected (Tag-Connect's TC2050-IDC-050 product page)." },
+    { "num": "6", "signal": "TDO (JTAG) / SWO (SWD)", "expect": ["swo", "tdo"], "required": false, "page": 1 },
+    { "num": "7", "signal": "RTCLK (JTAG) / not used (SWD)", "expect": "other", "required": false, "page": 1, "note": "JTAG return clock from the target (RTCK on the 20-pin header); not used in SWD. Arm's Cortex 10-pin has the key at this position." },
+    { "num": "8", "signal": "TDI (JTAG) / not used (SWD)", "expect": "tdi", "required": false, "page": 1 },
+    { "num": "9", "signal": "nTRST (JTAG) / not used (SWD)", "expect": "ntrst", "required": false, "page": 1, "note": "Only when the adapter's solder bridge selects nTRST. A Cortex 10-pin connector has GND (GNDDetect) at this position, so this pad means different things through different cables." },
+    { "num": "10", "signal": "RESET", "expect": "nrst", "required": false, "page": 1 }
+  ],
+  "status": "imported",
+  "made": { "by": "llm (research agent)", "at": "2026-11-13T21:39:40Z", "how": "from the maker's documents" }
+}

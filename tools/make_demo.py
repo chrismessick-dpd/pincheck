@@ -9,7 +9,8 @@ follow the real parts' datasheets; the circuit is made up. Library values are da
 unverified except where the demo story says someone checked them.
 
 Planted for the checks (tests/test.js expects them): UART TX to TX (func.uart) and DISP_INT and TOUCH_INT
-on EXTI line 4 (func.exti).
+on EXTI line 4 (func.exti), and J5, an ST STDC14 debug header whose virtual COM port is crossed: the MCU's
+USART2 TX on pin 13, which is the target's RX (conn.mate, with demo/connectors.json).
 """
 import json, pathlib, sys
 from xml.sax.saxutils import quoteattr, escape
@@ -70,14 +71,15 @@ PARTS = {
     'D3': ('LED', 'Green', '150060GS75000', 'Wurth Elektronik', 'LED GREEN CLEAR 0603 SMD', 'LED_SMD:LED_0603_1608Metric', P('K', 'A')),
     'D4': ('LED', 'Red', '150060RS75000', 'Wurth Elektronik', 'LED RED CLEAR 0603 SMD', 'LED_SMD:LED_0603_1608Metric', P('K', 'A')),
     'R16': RES('1k', '1K'), 'R17': RES('1k', '1K'),
+    'J5': ('Conn_02x07_Odd_Even', 'FTSH-107-01-L-DV-K-A', 'FTSH-107-01-L-DV-K-A', 'Samtec', 'CONN HEADER SMD 14POS 1.27MM', 'Connector_PinHeader_1.27mm:PinHeader_2x07_P1.27mm_Vertical_SMD', P(*[str(i) for i in range(1, 15)])),
 }
 NETS = {
     'AC_L': ['J1.1', 'F1.1'], 'AC_LF': ['F1.2', 'RV1.1', 'PS1.1', 'K1.COM', 'K2.COM', 'J4.2'], 'AC_N': ['J1.2', 'RV1.2', 'PS1.2'],
     'OUT1': ['K1.NO', 'J4.3'], 'OUT2': ['K2.NO', 'J4.1'],
     'GND': ['PS1.-VOUT', 'Q1.E', 'Q2.E', 'U7.1', 'C1.2', 'C2.2', 'C3.2', 'R6.2', 'U4.5', 'U4.33', 'C4.2', 'C5.2', 'C6.2', 'C41.2', 'C8.2', 'C9.2',
-            'J3.A1', 'J3.B1', 'J3.S1', 'R14.2', 'R15.2', 'J2.1', 'J2.24', 'D3.K', 'D4.K'] + ['U1.%s' % n for n in [1, 2, 11, 14] + list(range(36, 54))],
+            'J3.A1', 'J3.B1', 'J3.S1', 'R14.2', 'R15.2', 'J2.1', 'J2.24', 'D3.K', 'D4.K', 'J5.5', 'J5.7', 'J5.11'] + ['U1.%s' % n for n in [1, 2, 11, 14] + list(range(36, 54))],
     '5V': ['PS1.+VOUT', 'K1.A1', 'K2.A1', 'D1.K', 'D2.K', 'U7.3', 'U7.5', 'C1.1', 'C3.1', 'J3.A4', 'J3.B4'],
-    '3V3': ['L1.2', 'C2.1', 'R5.1', 'U4.4', 'C4.1', 'C5.1', 'C6.1', 'C41.1', 'U1.3', 'U1.8', 'C8.1', 'C9.1', 'R12.1', 'R13.1', 'J2.2', 'J2.3'],
+    '3V3': ['L1.2', 'C2.1', 'R5.1', 'U4.4', 'C4.1', 'C5.1', 'C6.1', 'C41.1', 'U1.3', 'U1.8', 'C8.1', 'C9.1', 'R12.1', 'R13.1', 'J2.2', 'J2.3', 'J5.3'],
     'SW': ['U7.2', 'L1.1', 'C13.2'], 'BST': ['U7.6', 'C13.1'], 'FB': ['U7.4', 'R5.2', 'R6.1'],
     'RLY1': ['K1.A2', 'D1.A', 'Q1.C'], 'RLY2': ['K2.A2', 'D2.A', 'Q2.C'], 'RLY1_B': ['Q1.B', 'R1.1'], 'RLY2_B': ['Q2.B', 'R2.1'],
     'RLY1_EN': ['R1.2', 'U4.7'], 'RLY2_EN': ['R2.2', 'U4.8'],
@@ -88,7 +90,9 @@ NETS = {
     'DISP_INT': ['J2.7', 'U4.11'], 'TOUCH_INT': ['J2.8', 'U4.28'],
     'CC1': ['J3.A5', 'R14.1'], 'CC2': ['J3.B5', 'R15.1'],
     'LED_G': ['D3.A', 'R16.1'], 'LED_R': ['D4.A', 'R17.1'], 'LED_GA': ['R16.2', 'U4.12'], 'LED_RA': ['R17.2', 'U4.13'],
-    'NRST': ['U4.6'], 'SWDIO': ['U4.24'], 'SWCLK': ['U4.25'],
+    # The debug header (STDC14): planted, the VCP crossed. Pin 13 (T_VCP_RX) is where the target's RX goes; U4's TX is there.
+    'NRST': ['U4.6', 'J5.12'], 'SWDIO': ['U4.24', 'J5.4'], 'SWCLK': ['U4.25', 'J5.6'],
+    'T_VCP_RX': ['U4.9', 'J5.13'], 'T_VCP_TX': ['U4.10', 'J5.14'],
 }
 
 
@@ -162,6 +166,7 @@ AF = {  # a few alternate functions, as the CubeMX import would list them
     'PB6': ['USART1_TX AF0', 'I2C1_SCL AF6', 'EXTI6'], 'PB7': ['USART1_RX AF0', 'I2C1_SDA AF6', 'EXTI7'],
     'PA0': ['ADC1_IN0', 'USART2_CTS AF1', 'EXTI0'], 'PA1': ['ADC1_IN1', 'USART2_RTS AF1', 'EXTI1'],
     'PA5': ['ADC1_IN5', 'SPI1_SCK AF0', 'EXTI5'], 'PA6': ['ADC1_IN6', 'SPI1_MISO AF0', 'EXTI6'],
+    'PA2': ['ADC1_IN2', 'USART2_TX AF1', 'EXTI2'], 'PA3': ['ADC1_IN3', 'USART2_RX AF1', 'EXTI3'],
     'PA4': ['ADC1_IN4', 'SPI1_NSS AF0', 'EXTI4'], 'PB4': ['SPI1_MISO AF0', 'TIM3_CH1 AF1', 'EXTI4'],
     'PA13': ['SWDIO AF0', 'EXTI13'], 'PA14-BOOT0': ['SWCLK AF0', 'BOOT0', 'EXTI14']}
 

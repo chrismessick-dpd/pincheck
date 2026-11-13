@@ -40,6 +40,7 @@ private repo `pincheck_data` as `parts/<id>.json`, and in each browser's Indexed
 | `match` | Other part numbers it covers, with `*` and `?` wildcards (`STM32G071K?U6*`). Only for parts with the same pinout and ratings: packing suffixes, temperature grades the checks don't care about. |
 | `kind` | One of `node tools/part.js kinds`. It picks which parameters the editor offers. |
 | `datasheet` | Which document the values came from: title, document number and revision, link, and the PDF's SHA-256. |
+| `status` | `imported` (brought in by an LLM or a library, not yet gone through by hand) or `checked` (a person went through it against the datasheet). Set in the Identity tab; a file without it counts as `imported`. Per-value `ok` still says which values were verified. |
 | `made`, `updated` | Who started the file and how (`from schematic`, `by hand`, `import:cubemx`, `llm (pincheck-part)`), and when it last changed. |
 
 ## Pins

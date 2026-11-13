@@ -56,6 +56,36 @@ Worked out before the checks, each with where it came from:
 Signal nets get a **high level** from pull-up resistors to a known rail and from the output pins on them
 (their domain's voltage).
 
+## Logic levels between parts (2026-11-13)
+
+Chris: a review missed an isolated CAN transceiver whose logic side ran on 5 V, talking through 22 Ω resistors to 3.3 V
+MCUs. The checks are general: any input driven by another part's output.
+
+- **Series resistors join a signal.** A two-pin resistor of known value up to **1 kΩ** (Chris) joins its two nets into
+  one signal when neither end is ground or a rail (that's a pull), each end has a logic pin (an IC's I/O pin or a
+  connector), and neither end has a resistor to ground less than 20 times its value (that's a divider, worked out by
+  Thevenin as before). Up to two hops. Findings name the resistors ("through R12").
+- **Thresholds on the receiver's own supply.** `io.vih` (`0.7*VCC1`) is evaluated with the receiver's domains, the
+  driver's `io.voh` (`VDD-0.4`) with the driver's. Push-pull drivers set the level whatever pulls the net. A VOH or VOL
+  that is a plain number holds for one test supply, so between parts on one rail only one that scales with the supply
+  is used; across rails a plain number is used as written.
+  - `io.vih`: the driver's guaranteed high below the input's VIH is an error; within 10% of the receiver's supply,
+    a warning.
+  - `io.vil`: the driver's VOL above the input's VIL.
+- **`io.unpowered`: a driver on a rail that can be up while the receiver's isn't.** Each rail is traced to where it
+  enters the board (a power input from the Connectors tab, a connector, up through regulators' highest input, load
+  switches, and series parts). Two rails are independent when they come from different sources or a load switch sits
+  between them, and not when one is made from the other. The receiver's limit with its supplies at 0 V is
+  `io.absmax.off` when the file has it, else the pin's usual maximum evaluated at 0 V (an STM32 FT pin's `VDD+4.0` is
+  4.0 V). An input the file calls fail-safe (`io.failsafe` naming it, or all) is fine. Independent rails: an error.
+  Sources not found: a warning.
+- **Parts not fitted leave the checks** (`fitted()`): an Altium variant's not-fitted list (`.PrjPcb` or
+  `.PrjPcbVariants`, the project's current variant; `design.js` `parseVariants`), or the part's own DNP parameter or
+  comment. The Parts page's notes say how many.
+
+The blind run that set this up, on the real board from git-ignored files: every one of the six transceiver channels
+gave its TXD VIH failure and its RXD into an unpowered MCU, and the DNP alternate's false alarms went away.
+
 ## The catalog
 
 `PK.checks.CATALOG` lists every check: key, group, title, and what it needs. The Findings filter comes

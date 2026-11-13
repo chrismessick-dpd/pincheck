@@ -73,10 +73,11 @@
         field('Manufacturer', 'manufacturer', f.manufacturer) +
         field('Package', 'package', f.package) +
         field('Supply domains', 'domains', f.domains.join(', '), 'Supply pin groups that have their own limits: VDD, VDDA, VBAT…') +
+        '<div class="field"><label>Status</label><select class="input" data-id="status">' + Object.entries(L.STATUSES).map(([k, l]) => '<option value="' + k + '"' + (L.status(f) === k ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</select><div class="pk-note">Imported: brought in by an LLM or a library, not yet gone through by hand. Checked: a person went through it against the datasheet.</div></div>' +
         '</div>' + field('Description', 'description', f.description) +
         '<div class="pk-ed-grid">' + field('Datasheet title', 'ds.title', f.datasheet.title) + field('Datasheet revision', 'ds.rev', f.datasheet.rev, 'e.g. "Rev 4, 2024-03" or "DS12232 Rev 3"') + '</div>' +
         field('Datasheet link', 'ds.url', f.datasheet.url) +
-        '<p class="pk-muted">Made ' + esc((f.made && f.made.how) || '') + (f.made && f.made.by ? ' by ' + esc(f.made.by) : '') + (f.made && f.made.at ? ', ' + esc(f.made.at.slice(0, 10)) : '') + '. File id <span class="pk-mono">' + esc(f.id) + '</span>.</p>';
+        '<p class="pk-muted">' + esc(L.madeLine(f)) + '. File id <span class="pk-mono">' + esc(f.id) + '</span>.</p>';
     }
 
     function pins() {
@@ -191,7 +192,7 @@
         if (id === 'match') f.match = t.value.split(',').map(s => s.trim()).filter(Boolean);
         else if (id === 'domains') f.domains = t.value.split(',').map(s => s.trim()).filter(Boolean);
         else if (id.startsWith('ds.')) f.datasheet[id.slice(3)] = t.value.trim();
-        else if (id !== 'only-filled' && id !== 'kind') f[id] = t.value.trim();
+        else if (id !== 'only-filled' && id !== 'kind' && id !== 'status') f[id] = t.value.trim();
         st.dirty = true; return;
       }
       if (t.dataset.pf) {
@@ -208,6 +209,7 @@
     sheet.addEventListener('change', e => {
       const t = e.target;
       if (t.dataset.id === 'kind') { f.kind = t.value; st.dirty = true; render(); }
+      else if (t.dataset.id === 'status') { f.status = t.value; st.dirty = true; }
       else if (t.dataset.id === 'only-filled') { st.onlyFilled = t.checked; render(); }
       else if (t.dataset.ok) {
         const v = valueOf(t.dataset.ok, t.dataset.on);

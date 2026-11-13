@@ -116,10 +116,60 @@
     }
     const source = netlist === 'KiCad XML' ? 'kicad' : schematic.size || netlist ? 'altium' : '';
     // The design's name: the Altium project's, if its .PrjPcb came along; else the one file's, or the top sheet's.
-    const prj = files.find(f => /\.prjpcb$/i.test(f.name));
+    // With two projects in a folder, the one named like the netlist.
+    const netBase = (files.find(f => /\.net$/i.test(f.name)) || { name: '' }).name.replace(/\.[^.]+$/, '').toLowerCase();
+    const prjs = files.filter(f => /\.prjpcb$/i.test(f.name));
+    const prj = prjs.find(f => f.name.replace(/\.[^.]+$/, '').toLowerCase() === netBase) || prjs[0];
+    // Variants (2026-11-13): parts the project's variant leaves unfitted, and parts whose own parameters say DNP,
+    // are kept in the list but left out of the checks (p.dnp).
+    let variants = [];
+    if (prj) {
+      const stem = prj.name.replace(/\.[^.]+$/, '').toLowerCase();
+      const vf = files.find(f => /\.prjpcbvariants$/i.test(f.name) && f.name.replace(/\.[^.]+$/, '').toLowerCase() === stem);
+      for (const f of [vf, prj].filter(Boolean)) { const v = parseVariants(PK.protel.decode(new Uint8Array(await f.arrayBuffer()))); if (v.variants.length) { variants = v.variants; variants.current = v.current; break; } }
+    }
+    const variant = variants.length ? (variants.find(v => v.name === variants.current) || variants[0]).name : '';
+    applyVariant(parts, variants, variant);
+    const dnp = parts.filter(p => p.dnp);
+    if (dnp.length) notes.push((variant ? 'Variant ' + variant + ': ' : '') + dnp.length + ' part' + (dnp.length === 1 ? '' : 's') + ' not fitted (' + dnp.slice(0, 6).map(p => p.ref).join(', ') + (dnp.length > 6 ? ', …' : '') + '), left out of the checks.');
     const top = sheets.find(s => /top|main|root/i.test(s));
     const base = prj ? prj.name.replace(/\.[^.]+$/, '') : files.length === 1 ? files[0].name.replace(/\.[^.]+$/, '') : top ? top.replace(/\.[^.]+$/, '') + ' (' + sheets.length + ' files)' : (sheets.length ? sheets.length + ' files' : 'Design');
-    return { name: base, source, netlist, sheets, parts, nets, notes, drawings, sheetsDrawn: drawings.length > 0 };
+    return { name: base, source, netlist, sheets, parts, nets, notes, drawings, sheetsDrawn: drawings.length > 0, variants: variants.map(v => ({ name: v.name, notFitted: v.notFitted })), variant };
+  }
+
+  // Altium's variants, from a .PrjPcb or .PrjPcbVariants: [ProjectVariantN] sections with Description=<name> and
+  // VariationN=Designator=U25.1|UniqueId=…|Kind=1|AlternatePart= lines (Kind=1 is Not Fitted). CurrentVariant names
+  // the one in use.
+  function parseVariants(text) {
+    const out = [], lines = String(text).split(/\r?\n/);
+    let cur = null, current = '';
+    for (const line of lines) {
+      const m = /^\[(.+)\]\s*$/.exec(line);
+      if (m) { cur = /^ProjectVariant\d+$/i.test(m[1]) ? { name: '', notFitted: [] } : null; if (cur) out.push(cur); continue; }
+      const cv = /^CurrentVariant=(.*)$/i.exec(line); if (cv && !current) current = cv[1].trim();
+      if (!cur) continue;
+      const d = /^Description=(.*)$/i.exec(line); if (d && !cur.name) cur.name = d[1].trim();
+      const v = /^Variation\d+=(.*)$/i.exec(line);
+      if (v) {
+        const f = Object.fromEntries(v[1].split('|').map(s => { const i = s.indexOf('='); return [s.slice(0, i), s.slice(i + 1)]; }));
+        if (f.Kind === '1' && f.Designator) cur.notFitted.push(f.Designator);
+      }
+    }
+    out.forEach((v, i) => { if (!v.name) v.name = 'Variant ' + (i + 1); });
+    return { variants: out, current };
+  }
+  // Mark parts not fitted: the variant's list, or the part's own parameters (DNP=Yes, Fitted=No, a DNP comment).
+  const DNP_TEXT = /\bDNP\b|\bDNF\b|not\s*fitted|no\s*fit|do not (populate|fit|place)/i;
+  function applyVariant(parts, variants, name) {
+    const v = (variants || []).find(x => x.name === name);
+    const off = new Set(v ? v.notFitted.map(s => s.toUpperCase()) : []);
+    for (const p of parts) {
+      const prm = p.params || {};
+      const own = Object.entries(prm).some(([k, val]) => (/^(DNP|DNF|No ?Fit|Not ?Fitted)$/i.test(k) && /^(1|y|yes|true|x)$/i.test(String(val).trim())) || (/^(Fitted|Populate|Populated|Fit)$/i.test(k) && /^(0|n|no|false)$/i.test(String(val).trim())))
+        || DNP_TEXT.test(String(prm.Comment || '') + ' ' + String(prm.Value || ''));
+      p.dnp = off.has(String(p.ref).toUpperCase()) || own || undefined;
+      if (!p.dnp) delete p.dnp;
+    }
   }
 
   // Parts that share a part number, grouped: [{ mpn, refs, part, kind }], the ICs first.
@@ -134,5 +184,5 @@
     return [...m.values()];
   }
 
-  PK.design = { build, identify, classify, groups, natural, MPN_KEYS };
+  PK.design = { build, identify, classify, groups, natural, MPN_KEYS, parseVariants, applyVariant };
 })(typeof window !== 'undefined' ? (window.PK = window.PK || {}) : (globalThis.PK = globalThis.PK || {}));

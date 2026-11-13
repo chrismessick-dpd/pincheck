@@ -164,3 +164,19 @@ time, each given this skill's steps and its one entry. Report every part at the 
      Verified, and Save.
 
 Never write into `pincheck_data` or any repo yourself: the file goes into the library through Pincheck.
+
+## Mate profiles and connector assignments (not part files)
+
+When Chris asks for a **mate profile** (what a programmer, cable, or other board needs on each pin of a board
+connector) or to say **which connector mates with what** on a design, write those instead of a part file. The formats
+are in `docs/connectors.md`.
+
+- A profile is `pincheck.mate/1`, from the maker's own document (user manual, pinout PDF), every pin with its page.
+  State each pin **from the target's side**, the board being checked: `uart-tx` is where the target's TX goes (the
+  tool receives). Decide direction from the document's direction or description column, never from a label like
+  `T_VCP_RX` alone; when the document leaves it unclear, say so in the pin's `note`. Never set `ok`.
+- An assignment file is `pincheck.connectors/1`, one per design (`design` is the name Pincheck shows). Suggest a
+  connector's mate only from what the schematic shows (its part number, its nets' names, its pin count), and list your
+  reasons to Chris; a power input's voltage and current come from Chris or the product's spec, not from a guess.
+- Write them as JSON files beside the batch file (or where Chris says); Chris imports them from the Connectors tab.
+  Pincheck does the checking; you never judge the pinout yourself.

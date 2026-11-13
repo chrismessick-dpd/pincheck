@@ -108,7 +108,16 @@
   async function importJson(text, name) {
     let g;
     try { g = JSON.parse(text); } catch (e) { toast(name + ': not JSON', 'error'); return; }
-    const list = Array.isArray(g) ? g : [g];
+    let list = Array.isArray(g) ? g : [g];
+    // Mate profiles and a design's connector assignments (assets/mates.js) go to their own store.
+    const other = list.filter(x => x && PK.mates && (x.schema === PK.mates.SCHEMA || x.schema === PK.mates.CONN));
+    if (other.length) {
+      const r = await PK.mates.importJson(other);
+      if (r.errors.length) toast(name + ': ' + r.errors[0], 'error');
+      if (r.profiles || r.designs) { toast('Imported ' + [r.profiles && plural(r.profiles, 'mate profile'), r.designs && plural(r.designs, 'design\'s connectors', 'designs\' connectors')].filter(Boolean).join(' and ')); renderAll(); scheduleSync(); }
+      list = list.filter(x => !other.includes(x));
+      if (!list.length) return;
+    }
     let n = 0;
     for (const f of list) {
       const errs = L.validate(f);
@@ -128,9 +137,10 @@
   function ensureRun(d) {
     // A run reopened from Signoff EE keeps its findings as sent until "Run checks again".
     if (d.fromRun && d.run) return d.run;
-    if (d.run && d.runGen === state.libGen) return d.run;
-    try { d.run = PK.checks.run(d, state.lib); } catch (e) { console.error(e); toast('The checks stopped: ' + e.message, 'error'); d.run = { findings: [], rails: [], coverage: {}, parts: {}, ms: 0, hasNets: false }; }
-    d.runGen = state.libGen;
+    const gen = state.libGen + ':' + (PK.mates ? PK.mates.cache.gen : 0);
+    if (d.run && d.runGen === gen) return d.run;
+    try { d.run = PK.checks.run(d, state.lib, PK.mates ? PK.mates.forDesign(d) : null); } catch (e) { console.error(e); toast('The checks stopped: ' + e.message, 'error'); d.run = { findings: [], rails: [], coverage: {}, parts: {}, ms: 0, hasNets: false }; }
+    d.runGen = gen;
     applyWaivers(d);
     return d.run;
   }
@@ -180,6 +190,9 @@
     state.sync.busy = true; state.sync.error = ''; renderToolbar();
     try {
       const r = await L.sync();
+      const m = PK.mates ? await PK.mates.sync() : { pulled: 0, pushed: 0, conflicts: 0 };
+      if (m.conflicts) r.conflicts = (r.conflicts || 0) + m.conflicts;
+      if (m.pulled || m.pushed) state.libGen++;
       state.sync.at = Date.now();
       if (r.conflicts) toast(r.conflicts + ' part file' + (r.conflicts === 1 ? ' was' : 's were') + ' changed here and in pincheck_data: the older copy is kept as “.conflict”');
       if (r.pulled || r.pushed) await reloadLib();
@@ -389,10 +402,10 @@
     const b = await R().open(e.bundle);
     const d = Object.assign(b.design, { id: 'r' + e.run.id, drawings: b.design.drawings || [], nets: b.design.nets || null, notes: b.design.notes || [], sheets: b.design.sheets || [] });
     d.sheetsDrawn = d.drawings.length > 0;
-    d.fromRun = { run: e.run, projectId: projectId || e.projectId || '', library: b.library };
+    d.fromRun = { run: e.run, projectId: projectId || e.projectId || '', library: b.library, connectors: b.connectors || null };
     // The rails, coverage, and parts from the part files it used then; the findings as sent.
     let run;
-    try { run = PK.checks.run(d, b.library); } catch (err) { run = { rails: [], coverage: {}, parts: {}, ms: 0, hasNets: !!d.nets }; }
+    try { run = PK.checks.run(d, b.library, b.connectors); } catch (err) { run = { rails: [], coverage: {}, parts: {}, ms: 0, hasNets: !!d.nets }; }
     run.findings = (e.findings || []).map(f => Object.assign({}, f, { refs: f.refs || [], pins: f.pins || [], nets: f.nets || [], basis: f.basis || [], sentWaived: f.waived || null }));
     d.run = run; d.runGen = state.libGen;
     applyWaivers(d);
@@ -411,6 +424,7 @@
     if (state.view !== 'design' || !d || state.busy) { seg.hidden = true; return; }
     const run = ensureRun(d), c = PK.pages.counts(run.findings.filter(f => !f.waived)), playing = scanning(d);
     const tabs = [['overview', 'Overview', ''], ['findings', 'Findings', !playing && (c.error || c.warn) ? '<span class="count">' + (c.error ? '✕ ' + c.error + ' ' : '') + (c.warn ? '▲ ' + c.warn : '') + '</span>' : ''], ['parts', 'Parts', '']];
+    if (PK.mates) tabs.splice(2, 0, ['connectors', 'Connectors', '']);
     if (PK.viewer) tabs.splice(2, 0, ['schematic', 'Schematic', '']);
     seg.hidden = false;
     seg.innerHTML = tabs.map(([k, l, x]) => '<button role="tab" data-tab="' + k + '" class="' + (state.tab === k ? 'on' : '') + '">' + l + x + '</button>').join('');
@@ -431,7 +445,7 @@
   function renderToolbar() {
     const el = $('#toolbar-actions');
     if (DEMO) { el.innerHTML = '<span class="pk-muted">Demo library (this browser only)</span>' + reportBtn(); return; }
-    const unsynced = state.lib.filter(f => f.local && f.local.dirty).length;
+    const unsynced = state.lib.filter(f => f.local && f.local.dirty).length + (PK.mates ? PK.mates.unsynced() : 0);
     const signed = window.SignoffFoot && window.SignoffFoot.who().token;
     let label;
     if (!signed) label = 'Library in this browser only · sign in to sync';
@@ -482,6 +496,7 @@
       const ctx = { lib: state.lib, state, hasSheets: !!d.sheetsDrawn };
       if (state.tab === 'findings') v.innerHTML = PK.pages.findings(d, ensureRun(d), ctx);
       else if (state.tab === 'parts') v.innerHTML = designPage(d);
+      else if (state.tab === 'connectors' && PK.mates) v.innerHTML = connectorsPage(d);
       else if (state.tab === 'schematic' && PK.viewer) { ensureRun(d); PK.viewer.render(v, d, state); }
       else {
         const run = ensureRun(d);
@@ -534,18 +549,147 @@
         '<td><span class="pk-mono">' + esc(g.mpn || '—') + '</span>' + (g.part.mpnFrom ? '<div class="pk-sub">from ' + esc(g.part.mpnFrom) + '</div>' : '') +
         near.map(n => '<div class="pk-sub">Close to <span class="pk-mono">' + esc(n.mpn) + '</span> <button class="pk-link" data-alias="' + esc(n.id) + '" data-mpn="' + esc(g.mpn) + '">Use its file</button></div>').join('') + '</td>' +
         '<td class="pk-desc">' + esc(g.part.description || g.part.params.Value || '') + '</td><td class="pk-num">' + g.part.pins.length + '</td>' +
-        '<td>' + (g.kind === 'ic' || g.kind === 'crystal' || f ? '<button class="btn btn-sm' + (f ? '' : ' btn-primary') + '" data-config="' + esc(g.part.ref) + '">' + (f ? 'Open' : 'Configure') + '</button>' : '') + '</td></tr>';
+        '<td>' + (g.kind === 'ic' || g.kind === 'crystal' || f || wantedRefs(d).has(g.part.ref) ? '<button class="btn btn-sm' + (f ? '' : ' btn-primary') + '" data-config="' + esc(g.part.ref) + '">' + (f ? 'Open' : 'Configure') + '</button>' : '') + '</td></tr>';
     }).join('');
-    const missing = ics.filter(g => g.mpn && !L.find(state.lib, g.mpn));
+    const missing = toConfigure(d);
+    const wanted = missing.filter(g => g.wanted).length;
     return '<div class="page pk-wide"><div class="page-head"><div class="page-head-text"><div class="eyebrow">' + (d.source === 'kicad' ? 'KiCad netlist' : d.source === 'altium' ? (d.netlist ? 'Altium schematic and Protel2 netlist' : 'Altium schematic') : 'Schematic') + '</div><h1 class="page-title">' + esc(d.name) + '</h1>' +
       '<div class="page-sub"><span>' + d.sheets.length + ' file' + (d.sheets.length === 1 ? '' : 's') + '</span><span class="sep">·</span><span>' + d.parts.length + ' parts</span><span class="sep">·</span><span>' + (d.nets ? d.nets.length + ' nets' : 'no netlist yet') + '</span></div></div>' +
       '<div class="pk-head-actions">' + (missing.length > 1 ? '<button class="btn" data-act="batch">Batch configure (' + missing.length + ')…</button>' : '') + (missing.length ? '<button class="btn btn-primary" data-config="' + esc(missing[0].part.ref) + '">Configure next (' + missing.length + ' left)</button>' : '') + '</div></div>' +
       '<div class="grid grid-4 pk-stats">' + stat(known.length + ' / ' + ics.length, 'ICs and crystals in the library') + stat(missing.length, 'to configure', missing.length ? 'warn' : '') + stat(ics.filter(g => !g.mpn).length, 'without a part number') + stat(state.lib.length, 'part files in the library') + '</div>' +
       (d.notes.length ? '<div class="hint" style="margin-top:16px">' + d.notes.map(esc).join('<br>') + '</div>' : '') +
+      (wanted ? '<div class="hint" style="margin-top:16px">' + plural(wanted, 'part') + ' in a power input’s path need' + (wanted === 1 ? 's' : '') + ' a part file for its current and voltage ratings: ' + esc(missing.filter(g => g.wanted).map(g => g.refs[0] + ' ' + g.mpn).join(', ')) + '. Configure next and Batch configure include ' + (wanted === 1 ? 'it' : 'them') + '.</div>' : '') +
       '<div class="pk-filter"><div class="seg">' + Object.entries(FILTERS).map(([k, [l]]) => '<button data-filter="' + k + '" class="' + (state.filter === k ? 'on' : '') + '">' + l + '</button>').join('') + '</div></div>' +
       '<div class="card pk-scroll"><table class="table pk-parts"><thead><tr><th>Library</th><th>Refs</th><th>Part number</th><th>Description</th><th class="pk-num">Pins</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div></div>';
   }
   const stat = (n, l, tone) => '<div class="card stat' + (tone ? ' pk-stat-' + tone : '') + '"><div class="stat-num">' + n + '</div><div class="pk-muted">' + l + '</div></div>';
+
+  // Parts to configure: ICs and crystals not in the library, then parts a check wanted a file for (a power input's
+  // fuses, FETs, diodes, and inductors, Chris 2026-11-13), marked `wanted`.
+  const wantedRefs = d => new Set(((d.run && d.run.needFiles) || []));
+  function toConfigure(d) {
+    ensureRun(d);
+    const out = D.groups(d, ['ic', 'crystal']).filter(g => g.mpn && !L.find(state.lib, g.mpn));
+    const have = new Set(out.map(g => g.mpn));
+    const want = wantedRefs(d);
+    for (const g of D.groups(d, null)) if (g.mpn && !have.has(g.mpn) && g.refs.some(r => want.has(r)) && !L.find(state.lib, g.mpn)) { out.push(Object.assign({}, g, { wanted: true })); have.add(g.mpn); }
+    return out;
+  }
+
+  // ── Connectors (docs/connectors.md): what mates with each connector, and power inputs ──
+  const isConnector = (p, f) => p.kind === 'connector' || (f && f.kind === 'connector');
+  const cnState = {}; // ref → power form open
+  function connectorsPage(d) {
+    const M = PK.mates, run = ensureRun(d);
+    const conns = d.parts.filter(p => isConnector(p, p.mpn && L.find(state.lib, p.mpn))).sort((a, b) => a.ref.localeCompare(b.ref, undefined, { numeric: true }));
+    const assigned = M.assignments(d);
+    const profiles = M.profiles();
+    const netOf = new Map(); for (const n of d.nets || []) for (const node of n.nodes) netOf.set(node.ref + '.' + node.pin, String(n.name).replace(/^\//, ''));
+    const fOf = ref => run.findings.filter(f => !f.waived && /^(conn\.|power\.)/.test(f.check) && f.refs.includes(ref));
+    const marks = list => { const c = PK.pages.counts(list); return (c.error ? '<span class="pk-st pk-sev-error">✕ ' + c.error + '</span> ' : '') + (c.warn ? '<span class="pk-st pk-sev-warn">▲ ' + c.warn + '</span> ' : '') + (c.info ? '<span class="pk-sub">i ' + c.info + '</span>' : ''); };
+    const sev = f => (f.severity === 'error' ? '✕' : f.severity === 'warn' ? '▲' : 'i');
+    const findingLine = f => '<div class="pk-cn-f pk-cn-' + f.severity + '"><span class="pk-cn-sev">' + sev(f) + '</span><button class="pk-link" data-fopen-go="' + esc(f.id) + '">' + esc(f.title) + '</button></div>';
+    const rows = conns.map(p => {
+      const a = assigned.find(x => x.ref === p.ref);
+      const fl = fOf(p.ref);
+      const sug = !a && M.suggest(d, p.ref);
+      const sel = '<select class="input pk-cn-sel" data-cn-mate="' + esc(p.ref) + '" aria-label="What mates with ' + esc(p.ref) + '"><option value="">Not set</option>' +
+        profiles.map(m => '<option value="' + esc(m.id) + '"' + (a && a.mate === m.id ? ' selected' : '') + '>' + esc(m.name) + (m.ok ? '' : ' (unverified)') + '</option>').join('') +
+        '<option value="power"' + (a && a.power ? ' selected' : '') + '>Power input…</option></select>';
+      let detail = '';
+      if (a && a.mate) {
+        const prof = profiles.find(m => m.id === a.mate);
+        if (!prof) detail = '<div class="pk-sub pk-warn">▲ The profile ' + esc(a.mate) + ' isn\'t in this browser. Sync, or import it.</div>';
+        else {
+          const byPin = new Map();
+          for (const f of fl) for (const pin of f.pins) if (pin.startsWith(p.ref + '.')) { const k = pin.slice(p.ref.length + 1); if (!byPin.has(k)) byPin.set(k, f); }
+          detail = '<table class="table pk-cn-pins"><thead><tr><th class="pk-num">Pin</th><th>' + esc(prof.name) + '</th><th>The target puts here</th><th>Net</th><th>Result</th></tr></thead><tbody>' +
+            prof.pins.map(pin => {
+              const ex = M.expects(pin), f = byPin.get(String(pin.num)), net = netOf.get(p.ref + '.' + pin.num);
+              const skipped = ex[0] === 'key' || ex[0] === 'other';
+              return '<tr><td class="pk-num">' + esc(pin.num) + '</td><td class="pk-mono">' + esc(pin.signal || '') + '</td><td>' + esc(ex.map(e => M.EXPECT[e] || e).join(' or ')) + (pin.required ? '' : ex.some(e => /^(swo|nrst|uart|tdi|tdo|ntrst)/.test(e)) ? ' <span class="pk-sub">(optional)</span>' : '') + (pin.note ? '<div class="pk-sub">' + esc(pin.note) + '</div>' : '') + '</td>' +
+                '<td class="pk-mono">' + esc(net || '—') + '</td><td>' + (f ? findingLine(f) : skipped ? '<span class="pk-sub">—</span>' : net || pin.required ? '<span class="pk-st pk-st-ok">✓</span>' : '<span class="pk-sub">open</span>') + '</td></tr>';
+            }).join('') + '</tbody></table>' +
+            '<div class="pk-sub pk-cn-src">' + esc(prof.mates || '') + (prof.source ? ' Source: ' + esc([prof.source.title, prof.source.doc, prof.source.rev].filter(Boolean).join(', ')) + (prof.source.page ? ', p. ' + esc(prof.source.page) : '') + (prof.source.url ? ' <a href="' + esc(prof.source.url) + '" target="_blank" rel="noopener">open</a>' : '') + '.' : '') +
+            (prof.ok ? ' Verified by ' + esc(prof.ok.by) + ', ' + esc(String(prof.ok.at).slice(0, 10)) + '.' : ' <b>Unverified:</b> its errors show as warnings until someone checks the pins against the source. <button class="btn btn-sm" data-cn="verify" data-id="' + esc(prof.id) + '">I checked it: mark verified</button>') + '</div>' +
+            fl.filter(f => !f.pins.some(x => x.startsWith(p.ref + '.') && byPin.get(x.slice(p.ref.length + 1)) === f)).map(findingLine).join('');
+        }
+      } else if (a && a.power || cnState[p.ref]) {
+        const pw = (a && a.power) || guessPower(d, p, netOf);
+        const v = pw.v || {};
+        const num = (k, val, ph) => '<input class="input pk-cn-num" data-pw="' + k + '" value="' + esc(val == null ? '' : val) + '" placeholder="' + ph + '" inputmode="decimal">';
+        detail = '<div class="pk-cn-power" data-pw-ref="' + esc(p.ref) + '">' +
+          '<label>Supply pins <input class="input pk-cn-pins-in" data-pw="pins" value="' + esc((pw.pins || []).join(', ')) + '" placeholder="1, 2"></label>' +
+          '<label>Return pins <input class="input pk-cn-pins-in" data-pw="return" value="' + esc((pw.return || []).join(', ')) + '" placeholder="3, 4"></label>' +
+          '<label>Voltage, V ' + num('min', v.min, 'min') + num('typ', v.typ, 'typ') + num('max', v.max, 'max') + '</label>' +
+          '<label>Current, A ' + num('i', pw.i, 'max') + '</label>' +
+          '<button class="btn btn-sm btn-primary" data-cn="power-save" data-ref="' + esc(p.ref) + '">' + (a ? 'Save' : 'Set as power input') + '</button>' +
+          (a ? '' : ' <button class="btn btn-sm" data-cn="power-cancel" data-ref="' + esc(p.ref) + '">Cancel</button>') + '</div>' +
+          (a ? fl.map(findingLine).join('') : '');
+      }
+      return '<tr class="pk-cn-row"><td class="pk-mono"><b>' + esc(p.ref) + '</b></td><td><span class="pk-mono">' + esc(p.mpn || '—') + '</span><div class="pk-sub">' + esc(p.description || p.params.Value || '') + '</div></td><td class="pk-num">' + p.pins.length + '</td>' +
+        '<td>' + sel + (sug ? '<div class="pk-sub">Looks like ' + esc(sug.name) + ' (' + sug.fit + ' of ' + sug.of + ' signal nets fit) <button class="pk-link" data-cn="suggest" data-ref="' + esc(p.ref) + '" data-id="' + esc(sug.id) + '">Use it</button></div>' : '') + '</td>' +
+        '<td>' + (a ? marks(fl) || '<span class="pk-st pk-st-ok">✓ No issues</span>' : '') + '</td></tr>' +
+        (detail ? '<tr class="pk-cn-detail"><td></td><td colspan="4">' + detail + '</td></tr>' : '');
+    }).join('');
+    return '<div class="page pk-wide"><div class="page-head"><div class="page-head-text"><div class="eyebrow">Connectors</div><h1 class="page-title">' + esc(d.name) + '</h1>' +
+      '<div class="page-sub"><span>' + plural(conns.length, 'connector') + '</span><span class="sep">·</span><span>' + assigned.filter(a => conns.some(p => p.ref === a.ref)).length + ' set</span><span class="sep">·</span><span>' + plural(profiles.length, 'mate profile') + '</span></div></div>' +
+      '<div class="pk-head-actions"><button class="btn" data-act="import">Import profile or connectors JSON…</button></div></div>' +
+      '<p class="pk-lede">Say what mates with each connector: a programmer or cable from the mate profiles, or a power input with its voltage and current. Pincheck follows each pin to the part it reaches and checks it against what should be there; the results are under Findings › Connectors. ' + (DEMO ? 'Kept in this browser in the demo.' : 'Synced with pincheck_data, so everyone checking ' + esc(d.name) + ' sees the same.') + '</p>' +
+      (d.fromRun ? '<div class="hint">A run reopened from Signoff EE is checked with the connectors it was sent with. Run checks again to use these.</div>' : '') +
+      (conns.length ? '<div class="card pk-scroll"><table class="table pk-parts pk-cn"><thead><tr><th>Ref</th><th>Part</th><th class="pk-num">Pins</th><th>Mates with</th><th>Result</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+        : '<div class="empty"><h2>No connectors found</h2><p>Parts with a J, P, CN, or X designator, or a part file of kind connector, show here.</p></div>') + '</div>';
+  }
+  // A power input's first guess: pins on a net whose name states a voltage are supply, ground pins return.
+  function guessPower(d, p, netOf) {
+    const pins = [], ret = []; let v = null;
+    for (const x of p.pins) {
+      const net = netOf.get(p.ref + '.' + x.num); if (!net) continue;
+      const nv = PK.checks.voltageFromName(net);
+      if (/^(GND|VSS|0V|PGND|GND_\w+)$/i.test(net)) ret.push(x.num);
+      else if (nv != null) { pins.push(x.num); v = v == null ? nv : v; }
+    }
+    return { pins, return: ret, v: v != null ? { typ: v } : {}, i: null };
+  }
+  const listOf = s => String(s || '').split(/[\s,;]+/).map(x => x.trim()).filter(Boolean);
+  const numOf = s => { const t = String(s || '').trim(); if (!t) return null; const n = P.parseNum(t); return n == null || !isFinite(n) ? null : n; };
+  async function setConnector(d, ref, entry) {
+    await PK.mates.setAssignment(d, ref, entry, who());
+    if (d.fromRun) toast('Saved. This run keeps the connectors it was sent with until Run checks again.');
+    renderTabs(); renderView(); scheduleSync();
+  }
+  document.addEventListener('change', async e => {
+    const ref = e.target.dataset && e.target.dataset.cnMate; if (!ref) return;
+    const d = active(); if (!d) return;
+    const v = e.target.value;
+    if (v === 'power') { cnState[ref] = true; const a = PK.mates.assignment(d, ref); if (a && a.mate) await setConnector(d, ref, null); else renderView(); return; }
+    delete cnState[ref];
+    await setConnector(d, ref, v ? { mate: v } : null);
+  });
+  document.addEventListener('click', async e => {
+    const t = e.target.closest('[data-cn],[data-fopen-go]'); if (!t) return;
+    const d = active(); if (!d) return;
+    if (t.dataset.fopenGo) { state.tab = 'findings'; state.check = ''; state.openFinding = t.dataset.fopenGo; renderTabs(); renderView(); $('#main').scrollTop = 0; return; }
+    const a = t.dataset.cn, ref = t.dataset.ref;
+    if (a === 'suggest') await setConnector(d, ref, { mate: t.dataset.id });
+    else if (a === 'power-cancel') { delete cnState[ref]; renderView(); }
+    else if (a === 'power-save') {
+      const box = t.closest('[data-pw-ref]'), val = k => (box.querySelector('[data-pw="' + k + '"]') || {}).value;
+      const pins = listOf(val('pins')), ret = listOf(val('return'));
+      const v = { min: numOf(val('min')), typ: numOf(val('typ')), max: numOf(val('max')) };
+      Object.keys(v).forEach(k => v[k] == null && delete v[k]);
+      if (!pins.length) { toast('Name the supply pins', 'error'); return; }
+      if (!Object.keys(v).length) { toast('Give the voltage: at least a typical or maximum', 'error'); return; }
+      delete cnState[ref];
+      await setConnector(d, ref, { power: { pins, return: ret, v, i: numOf(val('i')) } });
+    } else if (a === 'verify') {
+      const p = PK.mates.cache.profiles.get(t.dataset.id); if (!p) return;
+      if (!confirm('Mark ' + p.name + ' verified? Do this only after checking every pin against ' + ((p.source && (p.source.doc || p.source.title)) || 'the source') + (p.source && p.source.page ? ', page ' + p.source.page : '') + '. Its findings then count as errors.')) return;
+      p.ok = { by: who(), at: new Date().toISOString().replace(/\.\d+Z$/, 'Z') }; p.status = 'checked';
+      if (p.local) p.local.builtin = false;
+      await PK.mates.saveProfile(p); renderTabs(); renderView(); scheduleSync();
+    }
+  });
 
   function libraryPage() {
     const q = state.libQuery.trim().toUpperCase();
@@ -584,7 +728,7 @@
   // to fill each from its datasheet into a folder beside it, and the part files it writes come back with Import.
   const DS_KEY = 'pincheck.v1.datasheetDir';
   function batchConfigure(d) {
-    const missing = D.groups(d, ['ic', 'crystal']).filter(g => g.mpn && !L.find(state.lib, g.mpn));
+    const missing = toConfigure(d);
     if (!missing.length) return;
     const on = new Set(missing.map(g => g.mpn));
     const slug = L.slug(d.name).slice(0, 40) || 'design';
@@ -748,6 +892,8 @@
       const files = await Promise.all(names.map(async n => new File([await (await fetch('demo/altium/' + encodeURIComponent(n))).arrayBuffer()], n)));
       await openFiles(files);
       if (active()) active().name = 'Main PCBA (DT-1042 rev B)';
+      // Its connectors (demo/connectors.json): the debug header and the USB-C power input, once per browser.
+      if (PK.mates && active() && !PK.mates.recordOf(active())) { try { await PK.mates.importJson(await (await fetch('demo/connectors.json')).json()); } catch (e) { console.warn(e); } }
       renderAll();
       await openLink();   // a link from Signoff EE's demo opens over the demo's designs
     } catch (e) { toast('Couldn\'t load the demo: ' + e.message, 'error'); }
@@ -785,7 +931,7 @@
     intro: 'Pincheck reads schematics without signing in. Signed in, its part library syncs with the private pincheck_data repo.',
     changed: () => { renderToolbar(); syncNow(); }
   });
-  reloadLib().then(() => { if (DEMO) loadDemo(); else { syncNow(); openLink(); } });
+  (PK.mates ? PK.mates.load().catch(e => console.error(e)) : Promise.resolve()).then(reloadLib).then(() => { if (DEMO) loadDemo(); else { syncNow(); openLink(); } });
   setTimeout(checkForUpdate, 5000);
   setInterval(checkForUpdate, 5 * 60000);
   setInterval(renderToolbar, 60000);

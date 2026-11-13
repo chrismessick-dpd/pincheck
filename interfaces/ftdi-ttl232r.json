@@ -1,0 +1,20 @@
+{
+  "schema": "pincheck.mate/1",
+  "id": "ftdi-ttl232r",
+  "name": "FTDI TTL-232R (-5V and -3V3)",
+  "kind": "uart",
+  "mates": "An FTDI TTL-232R-5V or TTL-232R-3V3 USB to serial cable, whose 6-way 0.1 in single-in-line socket plugs onto a 1×6 2.54 mm pin header on the target.",
+  "connector": "1×6, 2.54 mm (0.1 in) pitch, single in line, unkeyed",
+  "numbering": "One row, pins 1 to 6 in the cable's order: pin 1 the black wire (GND) to pin 6 the green (RTS#). The socket is not keyed, so mark pin 1 on the board.",
+  "source": { "title": "TTL-232R TTL to USB Serial Converter Range of Cables Datasheet, section 4.2, Table 4.1 TTL-232R-5V and TTL-232R-3V3 Cable Signal Descriptions (FTDI's document, read from a copy hosted by the University of Cambridge)", "doc": "FT_000054", "rev": "Version 2.01", "url": "https://www.cl.cam.ac.uk/teaching/0910/P31/docs/usbseriallead.pdf", "page": 7 },
+  "pins": [
+    { "num": "1", "signal": "GND", "expect": "gnd", "required": true, "page": 7, "note": "Black. Device ground supply pin." },
+    { "num": "2", "signal": "CTS#", "expect": "uart-rts", "required": false, "page": 7, "note": "Brown. An input to the cable (clear to send), so the target's RTS output goes here." },
+    { "num": "3", "signal": "VCC", "expect": "power-in", "v": 5, "required": false, "page": 7, "note": "Red. A +5 V output on both cables: the -3V3 cable has 3.3 V signals only, VCC = +5 V (section 4, page 7). 4.25 V to 5.25 V, 75 mA maximum, depending on the USB port (Tables 4.2 and 4.4, page 8). Don't tie it to a 3.3 V rail." },
+    { "num": "4", "signal": "TXD", "expect": "uart-rx", "required": false, "page": 8, "note": "Orange. The cable's transmit data output, so the target's RX input goes here." },
+    { "num": "5", "signal": "RXD", "expect": "uart-tx", "required": false, "page": 8, "note": "Yellow. The cable's receive data input, so the target's TX output goes here." },
+    { "num": "6", "signal": "RTS#", "expect": "uart-cts", "required": false, "page": 8, "note": "Green. The cable's request to send output, so the target's CTS input goes here." }
+  ],
+  "status": "imported",
+  "made": { "by": "llm (research agent)", "at": "2026-11-13T21:39:40Z", "how": "from the maker's documents" }
+}

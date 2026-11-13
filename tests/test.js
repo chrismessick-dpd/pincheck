@@ -24,7 +24,7 @@
     ok(P.forKind('regulator').some(c => c.k === 'reg.vref') && !P.forKind('resistor').some(c => c.k === 'reg.vref'));
   });
   t('KiCad netlist: parts, pins, and nets', () => {
-    eq(design.source, 'kicad'); eq(design.parts.length, 39); eq(design.nets.length, 32);
+    eq(design.source, 'kicad'); eq(design.parts.length, 40); eq(design.nets.length, 34);
     const u4 = design.parts.find(p => p.ref === 'U4');
     eq(u4.pins.length, 33); eq(u4.pins.find(p => p.num === '4').name, 'VDD/VDDA'); eq(u4.pins.find(p => p.num === '4').type, 'power');
     eq(design.nets.find(n => n.name === '3V3').nodes.some(n => n.ref === 'U4' && n.pin === '4'), true);
@@ -134,6 +134,16 @@
     const v3 = r.rails.find(x => x.net === '3V3');
     eq(+v3.v.toFixed(3), 3.318); ok(/R5, R6/.test(v3.from));
     ok(!r.rails.some(x => x.net === 'SW'), 'the switch node has no DC voltage');
+  });
+  t('connectors: the demo\'s STDC14 header has its VCP crossed, and its USB-C input has no protection', async () => {
+    const conn = await (await fetch('../demo/connectors.json')).json();
+    const prof = await (await fetch('../interfaces/st-stdc14.json')).json();
+    const r = CK.run(design, lib, { assign: conn.connectors, profiles: { 'st-stdc14': prof } });
+    const m = r.findings.filter(f => f.check === 'conn.mate');
+    eq(m.map(f => f.pins[0]), ['J5.13', 'J5.14'], 'pins 13 and 14, nothing else');
+    ok(m.every(f => f.severity === 'warn' && f.unverified && /likely swapped/.test(f.detail)), 'warnings while the profile is unverified, naming the swap');
+    ok(CK.run(design, lib, { assign: conn.connectors, profiles: { 'st-stdc14': Object.assign({}, prof, { ok: { by: 't' } }) } }).findings.filter(f => f.check === 'conn.mate').every(f => f.severity === 'error'), 'errors once verified');
+    ok(r.findings.some(f => f.check === 'power.protection' && /^J3's 4\.75 to 5\.25 V input has no fuse, TVS, or reverse-polarity protection/.test(f.title)), 'J3 unprotected');
   });
   // A made-up board: a logic gate with its supply pins reversed, an LDO, and an MCU input pulled to 5 V.
   const mini = (() => {
@@ -253,6 +263,141 @@
     // USB wired: PA11 meets a USB_DM pin, so VDDUSB at 1.8 V is out of range.
     const q2 = quirks(); q2.design.nets.find(n => n.name === 'AMISO').name = 'USB_DM';
     ok(CK.run(q2.design, q2.lib).findings.some(f => f.check === 'supply.range' && /VDDUSB/.test(f.title)), 'VDDUSB checked when USB is wired');
+  });
+  // Connectors (docs/connectors.md): a made-up 14-pin debug header with its VCP crossed, and a 20–28 V input.
+  const connBoard = () => {
+    const pin = (num, name, type) => ({ num, name, type: type || 'passive' });
+    const two = (ref, kind, value, mpn) => ({ ref, mpn: mpn || '', kind, params: { Value: value }, pins: [pin('1', '1'), pin('2', '2')] });
+    const parts = [
+      { ref: 'U1', mpn: 'MCU9', kind: 'ic', params: {}, pins: [pin('1', 'VDD', 'power'), pin('2', 'VSS', 'power'), pin('3', 'PA13'), pin('4', 'PA14'), pin('5', 'PA2'), pin('6', 'PA3'), pin('7', 'NRST'), pin('8', 'PB7')] },
+      { ref: 'U2', mpn: 'BUCK', kind: 'ic', params: {}, pins: [pin('1', 'VIN', 'power'), pin('2', 'GND', 'power')] },
+      { ref: 'J5', mpn: 'HDR14', kind: 'connector', params: {}, pins: Array.from({ length: 14 }, (_, i) => pin(String(i + 1), String(i + 1))) },
+      { ref: 'J1', mpn: 'BARREL', kind: 'connector', params: {}, pins: [pin('1', '1'), pin('2', '2')] },
+      two('F1', 'other', '2A', 'FUSE2A'), two('R9', 'resistor', '22R'), two('D1', 'diode', 'SMAJ24A', 'SMAJ24A'),
+      { ref: 'Q1', mpn: 'PFET', kind: 'transistor', params: {}, pins: [pin('1', 'G'), pin('2', 'S'), pin('3', 'D')] },
+    ];
+    const N = (name, ...nodes) => ({ name, nodes: nodes.map(s => { const [ref, p] = s.split('.'); return { ref, pin: p }; }) });
+    const nets = [
+      N('3V3', 'U1.1', 'J5.3'), N('GND', 'U1.2', 'U2.2', 'J5.5', 'J5.7', 'J5.11', 'J1.2', 'D1.2', 'Q1.1'),
+      N('SWDIO', 'U1.3', 'J5.4'), N('SWCLK', 'U1.4', 'J5.6'),
+      N('VCP_A', 'U1.5', 'R9.1'), N('VCP_A2', 'R9.2', 'J5.14'), N('VCP_B', 'U1.6', 'J5.13'), N('NRST', 'U1.7', 'J5.12'),
+      N('VIN_RAW', 'J1.1', 'F1.1'), N('VIN_F', 'F1.2', 'D1.1', 'Q1.2'), N('24V', 'Q1.3', 'U2.1'),
+    ];
+    const ok_ = { by: 't' };
+    const file = (mpn, kind, pins, values) => ({ schema: 'pincheck.part/1', id: mpn.toLowerCase(), mpn, kind, match: [], pins, values: values || [], domains: ['VDD'], datasheet: {} });
+    const lib2 = [
+      file('MCU9', 'mcu', [{ num: '1', name: 'VDD', role: 'power-in', domain: 'VDD' }, { num: '2', name: 'VSS', role: 'ground' },
+        { num: '3', name: 'PA13', role: 'io', domain: 'VDD', functions: ['SWDIO AF0'] }, { num: '4', name: 'PA14', role: 'io', domain: 'VDD', functions: ['SWCLK AF0'] },
+        { num: '5', name: 'PA2', role: 'io', domain: 'VDD', functions: ['USART2_TX AF1'] }, { num: '6', name: 'PA3', role: 'io', domain: 'VDD', functions: ['USART2_RX AF1'] },
+        { num: '7', name: 'NRST', role: 'reset', domain: 'VDD' }, { num: '8', name: 'PB7', role: 'io', domain: 'VDD', functions: ['USART1_RX AF0'] }]),
+      file('BUCK', 'regulator', [{ num: '1', name: 'VIN', role: 'power-in', domain: 'VIN' }, { num: '2', name: 'GND', role: 'ground' }], [{ k: 'supply.range', on: 'VIN', min: 4.5, max: 26, unit: 'V', ok: ok_ }]),
+      file('BARREL', 'connector', [{ num: '1', name: '1', role: 'other' }, { num: '2', name: '2', role: 'other' }], [{ k: 'rate.i', value: 1.5, unit: 'A', ok: ok_ }]),
+      file('SMAJ24A', 'protection', [{ num: '1', name: 'K', role: 'other' }, { num: '2', name: 'A', role: 'other' }], [{ k: 'tvs.vrwm', value: 24, unit: 'V', ok: ok_ }]),
+    ];
+    const prof = { schema: 'pincheck.mate/1', id: 'test14', name: 'Test 14-pin', ok: ok_, pins: [
+      { num: '1', expect: 'nc' }, { num: '2', expect: 'nc' }, { num: '3', expect: 'vref', required: true }, { num: '4', expect: ['swdio', 'tms'], required: true },
+      { num: '5', expect: 'gnd' }, { num: '6', expect: ['swclk', 'tck'], required: true }, { num: '7', expect: 'gnd' }, { num: '8', expect: ['swo', 'tdo'] },
+      { num: '9', expect: 'key' }, { num: '10', expect: 'tdi' }, { num: '11', expect: 'gnd' }, { num: '12', expect: 'nrst' },
+      { num: '13', signal: 'T_VCP_RX', expect: 'uart-tx' }, { num: '14', signal: 'T_VCP_TX', expect: 'uart-rx' }] };
+    const conn = { assign: [{ ref: 'J5', mate: 'test14' }, { ref: 'J1', power: { pins: ['1'], return: ['2'], v: { min: 20, typ: 24, max: 28 }, i: 2 } }], profiles: { test14: prof } };
+    return { design: { parts, nets, sheets: [], notes: [] }, lib: lib2, conn, N };
+  };
+  t('connectors: a debug header\'s crossed VCP, and a power input\'s rail, contacts, TVS, and unrated parts', () => {
+    const b = connBoard(), r = CK.run(b.design, b.lib, b.conn);
+    const got = r.findings.filter(f => /^(conn|power)\./.test(f.check) || f.check === 'supply.range').map(f => f.severity + ' ' + f.check + ': ' + f.title);
+    eq(got, [
+      'error supply.range: U2 VIN (pin 1) at 28 V is outside 4.5 V to 26 V',
+      'error conn.mate: J5 pin 13 (T_VCP_RX on Test 14-pin) reaches U1 PA3, which has no UART TX function',
+      'error conn.mate: J5 pin 14 (T_VCP_TX on Test 14-pin) reaches U1 PA2 (through R9), which has no UART RX function',
+      'error power.contacts: J1\'s 20 to 28 V input carries 2 A; J1\'s contacts are rated 1.5 A',
+      'error power.ratings: D1\'s 24 V working voltage is below J1\'s 20 to 28 V input\'s 28 V maximum',
+      'info power.ratings: J1\'s 20 to 28 V input: 2 parts in its path without a rating to check',
+    ]);
+    ok(/likely swapped/.test(r.findings.find(f => f.pins[0] === 'J5.13').detail), 'names the swap');
+    eq(r.needFiles, ['F1', 'Q1'], 'the fuse and FET want part files');
+    eq((r.rails.find(x => x.net === '24V') || {}).from, 'J1 power input (20 to 28 V), through F1, Q1');
+    // Uncrossed, on two USARTs: one finding for the pair.
+    const b2 = connBoard();
+    b2.design.nets.find(n => n.name === 'VCP_B').nodes = [{ ref: 'U1', pin: '5' }, { ref: 'J5', pin: '13' }];
+    b2.design.nets.find(n => n.name === 'VCP_A').nodes = [{ ref: 'U1', pin: '8' }, { ref: 'R9', pin: '1' }];
+    const m2 = CK.run(b2.design, b2.lib, b2.conn).findings.filter(f => f.check === 'conn.mate').map(f => f.title);
+    eq(m2, ['J5\'s UART TX and RX are on different peripherals']);
+    // An unverified profile only warns; a header with fewer pins points at its numbering.
+    const b3 = connBoard(); delete b3.conn.profiles.test14.ok;
+    b3.design.parts.find(p => p.ref === 'J5').pins.splice(12);
+    const r3 = CK.run(b3.design, b3.lib, b3.conn).findings.filter(f => f.check === 'conn.mate');
+    ok(r3.every(f => f.severity !== 'error'), 'unverified: warnings');
+    ok(r3.some(f => /J5 has no pin 13, 14 for Test 14-pin/.test(f.title) && f.unverified), 'missing pins');
+    // No assignments: no connector findings, and the input's net keeps its name's voltage.
+    const r4 = CK.run(b.design, b.lib);
+    eq(r4.findings.filter(f => /^(conn|power)\./.test(f.check)).length, 0);
+    eq((r4.rails.find(x => x.net === '24V') || {}).v, 24);
+  });
+  // Logic levels (Chris, 2026-11-13): a made-up isolated transceiver with its logic side on a 5 V rail, talking through 22 Ω
+  // resistors to a 3.3 V MCU on a USB-powered rail; a DNP alternate on the same nets; a 1 kΩ into 10 kΩ divider.
+  const levelBoard = () => {
+    const pin = (num, name, type) => ({ num, name, type: type || 'passive' });
+    const two = (ref, kind, value) => ({ ref, mpn: '', kind, params: { Value: value }, pins: [pin('1', '1'), pin('2', '2')] });
+    const parts = [
+      { ref: 'U1', mpn: 'MCU7', kind: 'ic', params: {}, pins: [pin('1', 'VDD', 'power'), pin('2', 'VSS', 'power'), pin('3', 'PA1'), pin('4', 'PA2'), pin('5', 'PA3')] },
+      { ref: 'U2', mpn: 'XCVR5', kind: 'ic', params: {}, pins: [pin('1', 'VCC1', 'power'), pin('2', 'TXD'), pin('3', 'RXD'), pin('4', 'GND1', 'power')] },
+      { ref: 'U9', mpn: 'XCVR5ALT', kind: 'ic', params: {}, pins: [pin('1', 'VCC1', 'power'), pin('2', 'TXD'), pin('3', 'RXD'), pin('4', 'GND1', 'power')], dnp: true },
+      { ref: 'U3', mpn: 'LDO33', kind: 'ic', params: {}, pins: [pin('1', 'VIN', 'power'), pin('2', 'VOUT', 'power'), pin('3', 'GND', 'power')] },
+      { ref: 'U4', mpn: 'BUCK5', kind: 'ic', params: {}, pins: [pin('1', 'VIN', 'power'), pin('2', 'VOUT', 'power'), pin('3', 'GND', 'power')] },
+      { ref: 'J1', mpn: 'USBC', kind: 'connector', params: {}, pins: [pin('1', 'VBUS'), pin('2', 'GND')] },
+      { ref: 'J2', mpn: 'BARREL', kind: 'connector', params: {}, pins: [pin('1', '1'), pin('2', '2')] },
+      two('R1', 'resistor', '22R'), two('R2', 'resistor', '22R'), two('R3', 'resistor', '1k'), two('R4', 'resistor', '10k'), two('R5', 'resistor', '4.7k'),
+    ];
+    const N = (name, ...nodes) => ({ name, nodes: nodes.map(s => { const [ref, p] = s.split('.'); return { ref, pin: p }; }) });
+    const nets = [
+      N('VBUS', 'J1.1', 'U3.1'), N('VIN_24', 'J2.1', 'U4.1'), N('V3V3_USB', 'U3.2', 'U1.1', 'R5.1'), N('+5V0', 'U4.2', 'U2.1', 'U9.1'),
+      N('GND', 'J1.2', 'J2.2', 'U1.2', 'U2.4', 'U9.4', 'U3.3', 'U4.3', 'R4.2'),
+      N('TX_MCU', 'U1.3', 'R1.1'), N('CAN_TXD', 'R1.2', 'U2.2', 'U9.2'), N('RX_MCU', 'U1.4', 'R2.1'), N('CAN_RXD', 'R2.2', 'U2.3', 'U9.3'),
+      N('SENSE', 'U1.5', 'R3.1', 'R5.2'), N('SENSE_DIV', 'R3.2', 'R4.1'),
+    ];
+    const ok_ = { by: 't' };
+    const file = (mpn, kind, pins, values, domains) => ({ schema: 'pincheck.part/1', id: mpn.toLowerCase(), mpn, kind, match: [], pins, values: values || [], domains, datasheet: {} });
+    const lib2 = [
+      file('MCU7', 'mcu', [{ num: '1', name: 'VDD', role: 'power-in', domain: 'VDD' }, { num: '2', name: 'VSS', role: 'ground' },
+        { num: '3', name: 'PA1', role: 'io', domain: 'VDD', ft: true }, { num: '4', name: 'PA2', role: 'io', domain: 'VDD', ft: true }, { num: '5', name: 'PA3', role: 'io', domain: 'VDD' }],
+        [{ k: 'io.voh', on: 'VDD', value: 'VDD-0.4', unit: 'V', ok: ok_ }, { k: 'io.vih', on: 'VDD', value: '0.7*VDD', unit: 'V', ok: ok_ }, { k: 'io.absmax', on: 'VDD', value: 'VDD+0.3', unit: 'V', ok: ok_ }, { k: 'io.ft.absmax', value: 'VDD+4.0', unit: 'V', ok: ok_ }], ['VDD']),
+      file('XCVR5', 'interface', [{ num: '1', name: 'VCC1', role: 'power-in', domain: 'VCC1' }, { num: '2', name: 'TXD', role: 'input', domain: 'VCC1' }, { num: '3', name: 'RXD', role: 'output', domain: 'VCC1' }, { num: '4', name: 'GND1', role: 'ground' }],
+        [{ k: 'io.vih', on: 'VCC1', value: '0.7*VCC1', unit: 'V', ok: ok_ }, { k: 'io.voh', on: 'VCC1', value: 'VCC1-0.2', unit: 'V', ok: ok_ }, { k: 'io.absmax', on: 'VCC1', value: 'VCC1+0.5', unit: 'V', ok: ok_ }], ['VCC1']),
+      file('LDO33', 'regulator', [{ num: '1', name: 'VIN', role: 'power-in', domain: 'VIN' }, { num: '2', name: 'VOUT', role: 'power-out' }, { num: '3', name: 'GND', role: 'ground' }], [{ k: 'reg.vout', typ: 3.3, unit: 'V', ok: ok_ }], ['VIN']),
+      file('BUCK5', 'regulator', [{ num: '1', name: 'VIN', role: 'power-in', domain: 'VIN' }, { num: '2', name: 'VOUT', role: 'power-out' }, { num: '3', name: 'GND', role: 'ground' }], [{ k: 'reg.vout', typ: 5, unit: 'V', ok: ok_ }], ['VIN']),
+    ];
+    return { design: { parts, nets, sheets: [], notes: [] }, lib: lib2 };
+  };
+  t('logic levels: across series resistors, thresholds on the receiver\'s own supply, unpowered receivers, and DNP alternates', () => {
+    const b = levelBoard(), r = CK.run(b.design, b.lib);
+    const got = r.findings.filter(f => /^io\./.test(f.check)).map(f => f.severity + ' ' + f.check + ': ' + f.title);
+    eq(got, [
+      'error io.vih: U2 TXD (pin 2) needs 3.5 V to read high; U1.3 (PA1, VDD) (through R1) drives at least 2.9 V',
+      'error io.unpowered: U1 PA2 (pin 4) sees 5 V from U2 while U1 can be unpowered (limit 4 V)',
+      'error io.unpowered: U2 TXD (pin 2) sees 3.3 V from U1 while U2 can be unpowered (limit 0.5 V)',
+    ]);
+    ok(/from J2 through U4.*from J1 through U3|from J1 through U3.*from J2 through U4/.test(r.findings.find(f => f.check === 'io.unpowered').detail), 'names both rails\' sources');
+    // One rail from the other: not independent, so no unpowered finding.
+    const b2 = levelBoard();
+    b2.design.nets.find(n => n.name === 'VBUS').nodes = [{ ref: 'J1', pin: '1' }];
+    b2.design.nets.find(n => n.name === '+5V0').nodes.push({ ref: 'U3', pin: '1' });
+    eq(CK.run(b2.design, b2.lib).findings.filter(f => f.check === 'io.unpowered').length, 0, 'co-derived rails');
+    // With U2 not fitted and U9 fitted (no part file), nothing to compare: no findings and no contention.
+    const b3 = levelBoard(); b3.design.parts.find(p => p.ref === 'U2').dnp = true; delete b3.design.parts.find(p => p.ref === 'U9').dnp;
+    eq(CK.run(b3.design, b3.lib).findings.filter(f => /^io\./.test(f.check)).length, 0, 'DNP left out');
+    // Altium's variants: Kind=1 is not fitted.
+    const v = PK.design.parseVariants('CurrentVariant=Build\r\n[ProjectVariant1]\r\nDescription=Build\r\nVariation1=Designator=U9|UniqueId=\\X|Kind=1|AlternatePart=\r\nVariation2=Designator=R7|UniqueId=\\Y|Kind=0|AlternatePart=\r\n');
+    eq([v.current, v.variants[0].name, v.variants[0].notFitted], ['Build', 'Build', ['U9']]);
+  });
+  t('connectors: the shipped mate profiles are valid and cover the pins they say', async () => {
+    const names = await (await fetch('../interfaces/index.json')).json();
+    ok(names.length >= 5, 'five or more profiles');
+    for (const n of names) {
+      const p = await (await fetch('../interfaces/' + n)).json();
+      eq(PK.mates.validate(p), [], n);
+      eq(new Set(p.pins.map(x => String(x.num))).size, p.pins.length, n + ': pin numbers unique');
+      ok(p.source && p.source.url && p.source.doc, n + ': its source document and link');
+    }
   });
   t('XML reader: entities and CDATA', () => {
     const d = PK.kicad.xml('<a x="1 &amp; 2"><b>&lt;3</b><![CDATA[<raw>]]></a>');

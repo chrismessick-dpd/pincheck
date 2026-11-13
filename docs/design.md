@@ -57,7 +57,7 @@ against what each part allows, offline, from a library of part files. Started 20
 
 ## The parameter catalog
 
-`assets/params.js`: 201 keys in groups (supply, digital I/O, clocks, reset and straps, interfaces,
+`assets/params.js`: 202 keys in groups (supply, digital I/O, clocks, reset and straps, interfaces,
 regulator, switch, supervisor, analog, crystal, discrete, ratings, environment), each with a unit, a
 shape (range, value, text, list), whether it's per supply domain, and the part kinds it's offered for.
 The first set came from Chris's list (voltage, current, MCU alternate function) and the suite's
@@ -209,6 +209,11 @@ and waived); the issues, the notes, and the waived findings with their reasons; 
 library; and sign lines. It counts what Overview counts (waived findings leave the totals). The paper keeps
 light colors in dark mode (`.paper.pk-paper` in `styles.css`), and severities read from ✕, ▲, and i plus the
 word, since a printer may drop the stripes and dots. Esc or Close shuts it.
+
+## Connectors (2026-11-13)
+
+What mates with each connector (a programmer, a cable, a power input), set per design in the Connectors tab and
+checked pin by pin. See `docs/connectors.md`.
 
 ## Not built yet
 

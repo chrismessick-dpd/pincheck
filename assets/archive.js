@@ -7,7 +7,7 @@
 // PK.archive.expand(files) give back plain File objects, each with `path` (its place in the folder or zip).
 (function (PK) {
   'use strict';
-  const WANT = /\.(schdoc|net|xml|prjpcb|json)$/i;
+  const WANT = /\.(schdoc|net|xml|prjpcb|prjpcbvariants|json)$/i;
   const SKIP = /(^|\/)(__MACOSX|\.git|History|Project Logs for [^/]*|Project Outputs for [^/]*)\//i;
   const wanted = path => WANT.test(path) && !SKIP.test(path);
   const isZip = f => /\.zip$/i.test(f.name);
