@@ -127,5 +127,87 @@
     return h + '</div>';
   }
 
-  PK.pages = { overview, findings, counts, inspector };
+  // ── The report (as Signoff EE's): one printable page of the run's status and findings, drawn into the
+  // #report overlay, whose print styles (suite.css) show only it. It counts what Overview counts: waived
+  // findings leave the totals and get their own section with the reasons.
+  const BRAND = '<svg width="10" height="16" viewBox="0 0 59.21 98.68"><path d="M0 0h18.19v41.88H0zM0 56.79h18.19v41.88H0zM18.2 41.89h1.59v14.91H18.2zM19.79 0v41.89l24.96-6.63v28.16L19.79 56.79v41.89l39.42-10.47V10.47z" fill="#004952"/></svg>';
+  const SEV_ORDER = { error: 0, warn: 1, info: 2 };
+  const fmtDate = t => new Date(t).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  function report(d, run, ctx) {
+    const live = run.findings.filter(f => !f.waived), waived = run.findings.filter(f => f.waived);
+    const cc = counts(live), issues = cc.error + cc.warn;
+    const L = PK.library, lib = ctx.lib || [];
+    const ics = PK.design.groups(d, ['ic', 'crystal']);
+    const files = [], missing = [];
+    for (const g of ics) { const f = L.find(lib, g.mpn); if (f) { if (files.indexOf(f) < 0) files.push(f); } else missing.push(g); }
+    const vals = files.reduce((a, f) => { const s = L.stats(f); a.v += s.verified; a.n += s.values; return a; }, { v: 0, n: 0 });
+    const stored = d.fromRun && d.fromRun.run;
+    const checkedAt = stored && stored.at ? stored.at : Date.now();
+    const src = d.source === 'kicad' ? 'KiCad netlist' : d.netlist ? 'Altium schematic and Protel2 netlist' : d.source === 'altium' ? 'Altium schematic' : 'Schematic';
+    const cov = run.coverage || {};
+    const hasCov = Object.keys(cov).length > 0;
+    const pill = s => '<span class="pk-sev pk-sev-' + s + '"><span aria-hidden="true">' + SEV[s][0] + '</span>' + SEV[s][1] + '</span>';
+    const cell = (n, b) => '<td class="num">' + (b ? '<b>' + n + '</b>' : n) + '</td>';
+    const findingCell = f => {
+      const c = C.byKey.get(f.check);
+      return '<td><b style="font-weight:500">' + esc(f.title) + '</b>' + (f.unverified ? ' <span class="pk-tag-unv">unverified</span>' : '') +
+        (f.detail ? '<div class="r-cmt">' + esc(f.detail) + '</div>' : '') +
+        '<div class="r-cmt">' + esc(f.group + ' › ' + (c ? c.title : f.check)) + '</div>' +
+        (f.refs.length ? '<div class="r-cmt">Parts: <span class="pk-mono">' + esc(f.refs.slice(0, 40).join(', ') + (f.refs.length > 40 ? ' …' : '')) + '</span></div>' : '') +
+        (f.nets.length ? '<div class="r-cmt">Nets: <span class="pk-mono">' + esc(f.nets.slice(0, 20).join(', ') + (f.nets.length > 20 ? ' …' : '')) + '</span></div>' : '') +
+        (f.basis.length ? '<div class="r-cmt">Rests on: ' + f.basis.map(b => esc(b.mpn + ' ' + b.k + (b.on ? ' (' + b.on + ')' : '') + (b.page ? ', p.' + b.page : '')) + (b.verified ? ' ✓' : ' (unverified)')).join('; ') + '</div>' : '') + '</td>';
+    };
+    const sorted = list => list.slice().sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]);
+
+    let h = '<div class="report-bar"><b>Schematic check report</b><div style="display:flex;gap:8px"><button class="btn" data-act="close-report">Close</button><button class="btn btn-primary" data-act="print">Print / Save PDF</button></div></div>' +
+      '<div class="paper pk-paper">' +
+      '<div class="r-head"><div><div class="r-brand">' + BRAND + 'DOVETAIL · PINCHECK · SCHEMATIC CHECK</div>' +
+      '<h1 style="margin-top:14px">' + esc(d.name) + '</h1><div style="color:#515154">' + esc([src, plural(d.sheets.length, 'file'), plural(d.parts.length, 'part'), d.nets ? plural(d.nets.length, 'net') : 'no netlist'].join(' · ')) + '</div></div>' +
+      '<div style="text-align:right"><div style="font:600 30px var(--display);color:#004952">' + (issues ? issues : '✓') + '</div><div style="color:#86868b;font-size:11px">' + (issues ? (issues === 1 ? 'open issue' : 'open issues') : 'no open issues') + '</div></div></div>' +
+      '<div class="r-meta"><div><span>Checked</span>' + esc(fmtDate(checkedAt)) + '</div>' +
+      '<div><span>Findings</span>' + esc(plural(cc.error, 'error') + ', ' + plural(cc.warn, 'warning') + ', and ' + plural(cc.info, 'note')) + '</div>' +
+      '<div><span>Part files</span>' + (ics.length - missing.length) + ' of ' + plural(ics.length, 'IC and crystal', 'ICs and crystals') + '</div>' +
+      '<div><span>Values verified</span>' + vals.v + ' of ' + vals.n + '</div></div>';
+    if (stored) h += '<p class="r-cmt">A run sent to Signoff EE' + (stored.by ? ' by ' + esc(stored.by) : '') + ', with Pincheck ' + esc((stored.tool && stored.tool.version) || '') + ' and the ' + plural((stored.library && stored.library.files) || 0, 'part file') + ' it used then. These are its findings as sent.</p>';
+    if (!run.hasNets) h += '<p class="r-cmt"><b>Only the library checks ran:</b> the design has no nets (no Protel2 or KiCad netlist).</p>';
+    const unv = live.filter(f => f.unverified).length;
+    if (unv) h += '<p class="r-cmt">' + plural(unv, 'finding rests', 'findings rest') + ' on part-file values nobody has verified, so ' + (unv === 1 ? 'it is' : 'they are') + ' a warning at most.</p>';
+
+    // Summary by check group.
+    h += '<h2>Summary</h2><table><thead><tr><th>Checks</th>' + (hasCov ? '<th class="num">Checked</th><th class="num">Skipped</th>' : '') + '<th class="num">Errors</th><th class="num">Warnings</th><th class="num">Notes</th><th class="num">Waived</th></tr></thead><tbody>';
+    const tot = { checked: 0, skipped: 0, error: 0, warn: 0, info: 0, waived: 0 };
+    for (const g of groups()) {
+      const keys = C.CATALOG.filter(c => c.group === g).map(c => c.key);
+      const gc = counts(live.filter(f => f.group === g)), gw = waived.filter(f => f.group === g).length;
+      const k = keys.reduce((a, key) => { const x = cov[key] || {}; a.c += x.checked || 0; a.s += x.skipped || 0; return a; }, { c: 0, s: 0 });
+      tot.checked += k.c; tot.skipped += k.s; tot.error += gc.error; tot.warn += gc.warn; tot.info += gc.info; tot.waived += gw;
+      h += '<tr><td>' + esc(g) + ' <span class="r-cmt">(' + plural(keys.length, 'check') + ')</span></td>' + (hasCov ? cell(k.c) + cell(k.s) : '') + cell(gc.error) + cell(gc.warn) + cell(gc.info) + cell(gw) + '</tr>';
+    }
+    h += '<tr><td><b>Total</b></td>' + (hasCov ? cell(tot.checked, 1) + cell(tot.skipped, 1) : '') + cell(tot.error, 1) + cell(tot.warn, 1) + cell(tot.info, 1) + cell(tot.waived, 1) + '</tr></tbody></table>';
+    if (hasCov && tot.skipped) h += '<p class="r-cmt">Skipped: places a check couldn\'t look at for want of a part file, a value, or a net.</p>';
+
+    // Issues (errors and warnings), then notes, then waived.
+    const iss = sorted(live.filter(f => f.severity !== 'info'));
+    h += '<h2>Issues</h2>' + (iss.length ? '<table><thead><tr><th>#</th><th>Severity</th><th>Finding</th></tr></thead><tbody>' +
+      iss.map((f, i) => '<tr><td>' + (i + 1) + '</td><td>' + pill(f.severity) + '</td>' + findingCell(f) + '</tr>').join('') + '</tbody></table>'
+      : '<p>No errors or warnings.</p>');
+    const notes = live.filter(f => f.severity === 'info');
+    if (notes.length) h += '<h2>Notes</h2><table><thead><tr><th>#</th><th>Severity</th><th>Finding</th></tr></thead><tbody>' +
+      notes.map((f, i) => '<tr><td>' + (i + 1) + '</td><td>' + pill('info') + '</td>' + findingCell(f) + '</tr>').join('') + '</tbody></table>';
+    if (waived.length) h += '<h2>Waived</h2><table><thead><tr><th>#</th><th>Severity</th><th>Finding</th><th>Waiver</th></tr></thead><tbody>' +
+      sorted(waived).map((f, i) => '<tr><td>' + (i + 1) + '</td><td>' + pill(f.severity) + '</td>' + findingCell(f) +
+        '<td>' + esc(f.waived.reason || '') + '<div class="r-cmt">' + esc([f.waived.by, (f.waived.at || '').slice(0, 10)].filter(Boolean).join(', ')) + (f.waived.scope === 'similar' ? ' (with every finding like it)' : '') + '</div></td></tr>').join('') + '</tbody></table>';
+
+    // Rails, and the parts the checks couldn't look into.
+    const rails = (run.rails || []).filter(r => r.v > 0.01);
+    if (rails.length) h += '<h2>Rails</h2><table><thead><tr><th>Net</th><th class="num">Voltage</th><th>From</th></tr></thead><tbody>' +
+      rails.map(r => '<tr><td class="pk-mono">' + esc(r.net) + '</td><td class="num">' + (+r.v.toFixed(3)) + ' V</td><td>' + esc(r.from) + (r.unverified ? ' <span class="pk-tag-unv">unverified</span>' : '') + '</td></tr>').join('') + '</tbody></table>';
+    if (missing.length) h += '<h2>Not in the library</h2><p class="r-cmt">These parts have no part file, so the checks didn\'t look at their pins.</p><table><thead><tr><th>Part number</th><th>Refs</th></tr></thead><tbody>' +
+      missing.map(g => '<tr><td class="pk-mono">' + esc(g.mpn || 'No part number') + '</td><td class="pk-mono">' + esc(g.refs.join(', ')) + '</td></tr>').join('') + '</tbody></table>';
+
+    return h + '<div class="sign"><div>Reviewed by</div><div>Approved by</div></div>' +
+      '<div class="r-foot"><span>Generated by Pincheck ' + esc(PK.VERSION || '') + ' on ' + esc(fmtDate(Date.now())) + '</span><span>' + esc(d.name) + '</span></div></div>';
+  }
+
+  PK.pages = { overview, findings, counts, inspector, report };
 })(window.PK = window.PK || {});

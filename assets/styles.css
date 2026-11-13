@@ -358,3 +358,17 @@ body.pk-dragging .pk-dropzone { display: grid; }
 .so-locs li { margin: 2px 0; word-break: break-word; }
 .so-gone { padding: 10px 2px 0; font-size: 12.5px; color: var(--text-3); }
 .pk-stored { margin-top: 4px; }
+
+/* The report (#report, built by PK.pages.report): suite.css draws the overlay, the white paper, and its print
+   layout; these keep the severity pills and tags in light colors on that paper in dark mode too, and print
+   their stripes and dots (the glyphs and words carry severity even where a printer drops them). */
+.paper.pk-paper {
+  --text: #1d1d1f; --text-2: #515154; --text-3: #86868b; --bg-sunk: #f2f2f5;
+  --accent-ink: #004952; --accent-soft: rgba(0, 114, 127, 0.10);
+  --issue: #d70015; --issue-soft: rgba(255, 59, 48, 0.12); --warn: #946f00; --warn-soft: rgba(255, 214, 10, 0.22);
+  --issue-hatch: repeating-linear-gradient(-45deg, rgba(215, 0, 21, 0.22) 0 1.5px, transparent 1.5px 6px);
+  --warn-hatch: radial-gradient(circle, rgba(148, 111, 0, 0.42) 0 0.8px, transparent 1.3px) 0 0 / 5px 5px;
+}
+.paper .pk-sev { min-width: 0; white-space: nowrap; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.paper .pk-mono { word-break: break-word; }
+.paper h2 + .r-cmt { margin: -4px 0 8px; }

@@ -23,6 +23,7 @@
     moon: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M16 12.3A6.5 6.5 0 0 1 7.7 4a6.5 6.5 0 1 0 8.3 8.3z"/></svg>',
     chip: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="6" y="5" width="8" height="10" rx="1.5"/><path d="M3 8h3M3 12h3M14 8h3M14 12h3"/></svg>',
     drop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 14v4.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V14"/></svg>',
+    doc: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M5 2.5h6.5L15 6v11.5H5z"/><path d="M11.5 2.5V6H15M7.5 10h5M7.5 13h5"/></svg>',
     sync: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 6.5A5 5 0 0 0 3.6 4.8M3 9.5a5 5 0 0 0 9.4 1.7"/><path d="M3.3 2.5v2.6h2.6M12.7 13.5v-2.6h-2.6"/></svg>'
   };
   function applyTheme(t) {
@@ -45,6 +46,10 @@
     if (!app.classList.contains('nav-open') || e.target !== app) return;
     app.classList.remove('nav-open'); e.preventDefault(); e.stopPropagation();
   }, true);
+  // Esc closes the report first.
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !$('#report').hidden) { e.preventDefault(); e.stopImmediatePropagation(); closeReport(); }
+  });
   // Findings: Esc closes the detail panel; up and down step through the rows shown, opening each.
   document.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest('input, textarea, select, [contenteditable]') || document.querySelector('.sheet-wrap')) return;
@@ -421,9 +426,11 @@
     $('#library-link').classList.toggle('active', state.view === 'library');
   }
 
+  // Report (as Signoff EE's top-right button): a design's status and findings on one printable page.
+  const reportBtn = () => state.view === 'design' && active() && !state.busy ? '<button class="btn" data-act="report" title="Report: status and findings, to print or save as PDF">' + ICON.doc + '<span class="btn-label">Report</span></button>' : '';
   function renderToolbar() {
     const el = $('#toolbar-actions');
-    if (DEMO) { el.innerHTML = '<span class="pk-muted">Demo library (this browser only)</span>'; return; }
+    if (DEMO) { el.innerHTML = '<span class="pk-muted">Demo library (this browser only)</span>' + reportBtn(); return; }
     const unsynced = state.lib.filter(f => f.local && f.local.dirty).length;
     const signed = window.SignoffFoot && window.SignoffFoot.who().token;
     let label;
@@ -433,11 +440,21 @@
     else if (unsynced) label = unsynced + ' unsynced';
     else if (state.sync.at) label = 'Library synced ' + ago(state.sync.at);
     else label = 'Library not synced yet';
-    el.innerHTML = '<span class="pk-muted' + (state.sync.error ? ' pk-err' : '') + '">' + esc(label) + '</span>' + (signed ? '<button class="icon-btn" data-act="sync" title="Sync the library with pincheck_data" aria-label="Sync">' + ICON.sync + '</button>' : '');
+    el.innerHTML = '<span class="pk-muted' + (state.sync.error ? ' pk-err' : '') + '">' + esc(label) + '</span>' + (signed ? '<button class="icon-btn" data-act="sync" title="Sync the library with pincheck_data" aria-label="Sync">' + ICON.sync + '</button>' : '') + reportBtn();
   }
   const ago = t => { const s = Math.round((Date.now() - t) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.round(s / 60) + ' min ago' : Math.round(s / 3600) + ' h ago'; };
 
   function renderView() { drawView(); syncInspector(); }
+
+  function openReport() {
+    const d = active(); if (!d) return;
+    const r = $('#report');
+    r.innerHTML = PK.pages.report(d, ensureRun(d), { lib: state.lib });
+    // On a narrow screen a wide table scrolls inside the paper instead of pushing past it (as EE's).
+    r.querySelectorAll('.paper table').forEach(t => { const w = document.createElement('div'); w.className = 'r-scroll'; t.parentNode.insertBefore(w, t); w.appendChild(t); });
+    r.hidden = false; r.scrollTop = 0;
+  }
+  const closeReport = () => { $('#report').hidden = true; };
 
   // A selected finding's detail panel on Overview and Findings (findings.js inspector), with its thumbnail
   // on the schematic (viewer.js preview). Redrawn only when the finding or its run changes.
@@ -662,6 +679,9 @@
     }
     const a = t.dataset.act;
     if (a === 'close-insp') closeInspector();
+    else if (a === 'report') openReport();
+    else if (a === 'close-report') closeReport();
+    else if (a === 'print') window.print();
     else if (a === 'batch') { const d = active(); if (d) batchConfigure(d); }
     else if (a === 'nav') toggleSidebar();
     else if (a === 'home') { state.view = 'home'; renderAll(); }

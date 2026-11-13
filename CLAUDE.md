@@ -53,6 +53,10 @@ the suite's hard rules.
   `#/findings?run=&project=&check=&finding=`. A reopened run shows its findings as sent until Run checks again.
   Tried in the demo only; the live store and hand-off are tested against a fake GitHub (`tests/fake-github.js`).
 
+- **Report (2026-11-13, Chris: like EE's top-right Report, printing the status and issues; pushed):** the
+  toolbar's Report on a design opens `PK.pages.report` in `#report`, printed by `suite.css`. See `docs/design.md`,
+  *The report*.
+
 ## Rules
 
 - **No client data in this repo.** Not in code, docs, tests, demo, or commit messages. Real projects
@@ -78,7 +82,7 @@ the suite's hard rules.
    change to `model.js` or `github.js`.
 2. `python tools/stamp_version.py`.
 3. Serve the tools folder (preview `signoff-suite-alt`, port 8774) and open `pincheck/tests/test.html`:
-   PASS (40 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
+   PASS (41 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
    three sheets.
 4. In the browser pane, scripts are cached: fetch changed files with `{cache: 'reload'}` first. The demo
    library is loaded into IndexedDB `pincheck-demo` once; delete that database to reload it.

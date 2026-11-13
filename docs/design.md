@@ -198,6 +198,18 @@ section of `assets/styles.css` build it.
   `refs`, and `nets`). Next step: have `checks.js` record the pins and parts at its `tick()` calls behind
   an option, and draw those instead.
 
+## The report (2026-11-13)
+
+Chris: a Report button in the top right, as Signoff EE has, that prints the check's status and issues. It shows
+on a design's pages (`reportBtn` in `app.js`) and opens `PK.pages.report` (`assets/findings.js`) in the `#report`
+overlay, whose print styles come from EE's stylesheet (`suite.css`: only the paper prints). The page has the
+design, its source and counts, when it was checked (a stored run's date), open issues, findings by severity,
+ICs with a part file, and values verified; a summary per check group (checked, skipped, errors, warnings, notes,
+and waived); the issues, the notes, and the waived findings with their reasons; the rails; the ICs not in the
+library; and sign lines. It counts what Overview counts (waived findings leave the totals). The paper keeps
+light colors in dark mode (`.paper.pk-paper` in `styles.css`), and severities read from ✕, ▲, and i plus the
+word, since a printer may drop the stripes and dots. Esc or Close shuts it.
+
 ## Not built yet
 
 - Nets derived from SchDoc files without a netlist (not planned while Protel2 works).

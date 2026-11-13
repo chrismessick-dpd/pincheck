@@ -551,6 +551,22 @@
     } finally { await del(made.run.id); }
   });
 
+  t('report: counts what Overview counts, lists waived findings apart, and escapes names', () => {
+    const run = altRun();
+    const fs = run.findings.map(f => Object.assign({}, f, { waived: null }));
+    const iss = fs.filter(f => f.severity !== 'info');
+    ok(iss.length > 1, 'the demo has issues');
+    iss[0].waived = { reason: 'Checked on the bench', by: 'tester', at: '2026-11-13T00:00:00Z', scope: 'one' };
+    const html = PK.pages.report(Object.assign({}, alt, { name: 'Board <b>' }), Object.assign({}, run, { findings: fs }), { lib });
+    const box = document.createElement('div'); box.innerHTML = html;
+    const sec = name => [...box.querySelectorAll('h2')].find(h => h.textContent === name);
+    const rows = name => { const h = sec(name); return h ? h.nextElementSibling.querySelectorAll('tbody tr').length : 0; };
+    eq(rows('Issues'), iss.length - 1);
+    eq(rows('Waived'), 1);
+    ok(box.textContent.includes('Checked on the bench'), 'waiver reason shown');
+    ok(html.includes('Board &lt;b&gt;') && !box.querySelector('h1 b'), 'name escaped');
+  });
+
   for (const [name, fn] of tests) {
     try { await fn(); out.push('✓ ' + name); } catch (e) { fails.push(name); out.push('✕ ' + name + '\n    ' + e.message); }
   }
