@@ -1,0 +1,834 @@
+<?xml version="1.0" encoding="utf-8"?>
+<export version="E">
+  <design>
+    <source>thermostat-main-pcba.kicad_sch</source>
+    <date>2026-11-12</date>
+    <tool>Eeschema 8.0.6</tool>
+  </design>
+  <components>
+    <comp ref="J1">
+      <value>MKDS 1,5/2-5,08</value>
+      <footprint>TerminalBlock:PhoenixContact_MKDS-1,5-2-5.08</footprint>
+      <fields>
+        <field name="MPN">1729128</field>
+        <field name="Manufacturer">Phoenix Contact</field>
+      </fields>
+      <libsource lib="thermostat" part="TerminalBlock_2" description="TERM BLK 2POS SIDE ENTRY 5.08MM PCB"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="F1">
+      <value>TR5 1A T</value>
+      <footprint>Fuse:Fuse_Littelfuse-TR5</footprint>
+      <fields>
+        <field name="MPN">37211000411</field>
+        <field name="Manufacturer">Littelfuse</field>
+      </fields>
+      <libsource lib="thermostat" part="Fuse" description="FUSE BRD MNT 1A 250VAC RADIAL TR5"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="RV1">
+      <value>V275LA4P</value>
+      <footprint>Varistor:RV_Disc_D7mm</footprint>
+      <fields>
+        <field name="MPN">V275LA4P</field>
+        <field name="Manufacturer">Littelfuse</field>
+      </fields>
+      <libsource lib="thermostat" part="Varistor" description="VARISTOR 430V 1.2KA DISC 7MM"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="PS1">
+      <value>RAC02-05SK</value>
+      <footprint>Converter_ACDC:RECOM_RAC02-xxSK</footprint>
+      <fields>
+        <field name="MPN">RAC02-05SK</field>
+        <field name="Manufacturer">RECOM Power</field>
+      </fields>
+      <libsource lib="thermostat" part="RAC02-05SK" description="AC/DC CONVERTER 5V 2W SIP-4"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="K1">
+      <value>HF46F-G/5-HS1</value>
+      <footprint>Relay_THT:Relay_SPST_Hongfa_HF46F-G</footprint>
+      <fields>
+        <field name="MPN">HF46F-G/5-HS1</field>
+        <field name="Manufacturer">Hongfa</field>
+      </fields>
+      <libsource lib="thermostat" part="Relay_SPST" description="RELAY GEN PURPOSE SPST 5A 5V"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="K2">
+      <value>HF46F-G/5-HS1</value>
+      <footprint>Relay_THT:Relay_SPST_Hongfa_HF46F-G</footprint>
+      <fields>
+        <field name="MPN">HF46F-G/5-HS1</field>
+        <field name="Manufacturer">Hongfa</field>
+      </fields>
+      <libsource lib="thermostat" part="Relay_SPST" description="RELAY GEN PURPOSE SPST 5A 5V"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="J4">
+      <value>MKDS 1,5/3-5,08</value>
+      <footprint>TerminalBlock:PhoenixContact_MKDS-1,5-3-5.08</footprint>
+      <fields>
+        <field name="MPN">1729131</field>
+        <field name="Manufacturer">Phoenix Contact</field>
+      </fields>
+      <libsource lib="thermostat" part="TerminalBlock_3" description="TERM BLK 3POS SIDE ENTRY 5.08MM PCB"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="Q1">
+      <value>MMBT3904LT1G</value>
+      <footprint>Package_TO_SOT_SMD:SOT-23</footprint>
+      <fields>
+        <field name="MPN">MMBT3904LT1G</field>
+        <field name="Manufacturer">onsemi</field>
+      </fields>
+      <libsource lib="thermostat" part="Q_NPN_BEC" description="TRANS NPN 40V 0.2A SOT23"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="Q2">
+      <value>MMBT3904LT1G</value>
+      <footprint>Package_TO_SOT_SMD:SOT-23</footprint>
+      <fields>
+        <field name="MPN">MMBT3904LT1G</field>
+        <field name="Manufacturer">onsemi</field>
+      </fields>
+      <libsource lib="thermostat" part="Q_NPN_BEC" description="TRANS NPN 40V 0.2A SOT23"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="D1">
+      <value>1N4148W-7-F</value>
+      <footprint>Diode_SMD:D_SOD-123</footprint>
+      <fields>
+        <field name="MPN">1N4148W-7-F</field>
+        <field name="Manufacturer">Diodes Incorporated</field>
+      </fields>
+      <libsource lib="thermostat" part="D" description="DIODE GEN PURP 100V 300MA SOD123"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="D2">
+      <value>1N4148W-7-F</value>
+      <footprint>Diode_SMD:D_SOD-123</footprint>
+      <fields>
+        <field name="MPN">1N4148W-7-F</field>
+        <field name="Manufacturer">Diodes Incorporated</field>
+      </fields>
+      <libsource lib="thermostat" part="D" description="DIODE GEN PURP 100V 300MA SOD123"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="R1">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">RC0402FR-071KL</field>
+        <field name="Manufacturer">Yageo</field>
+      </fields>
+      <libsource lib="thermostat" part="R" description="RES SMD 1k 1% 1/16W 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="R2">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">RC0402FR-071KL</field>
+        <field name="Manufacturer">Yageo</field>
+      </fields>
+      <libsource lib="thermostat" part="R" description="RES SMD 1k 1% 1/16W 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="U7">
+      <value>TPS562201DDCR</value>
+      <footprint>Package_TO_SOT_SMD:SOT-23-6</footprint>
+      <fields>
+        <field name="MPN">TPS562201DDCR</field>
+        <field name="Manufacturer">Texas Instruments</field>
+      </fields>
+      <libsource lib="thermostat" part="TPS562201" description="IC REG BUCK ADJ 2A SOT23-6"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="L1">
+      <value>2.2uH</value>
+      <footprint>Inductor_SMD:L_Coilcraft_XAL4020-222</footprint>
+      <fields>
+        <field name="MPN">XAL4020-222MEB</field>
+        <field name="Manufacturer">Coilcraft</field>
+      </fields>
+      <libsource lib="thermostat" part="L" description="FIXED IND 2.2UH 5.5A 35 MOHM SMD"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="C1">
+      <value>10uF</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <fields>
+        <field name="MPN">CL21A106KAYNNNE</field>
+        <field name="Manufacturer">Samsung</field>
+      </fields>
+      <libsource lib="thermostat" part="C" description="CAP CER 10UF 25V X5R 0805"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="C2">
+      <value>22uF</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <fields>
+        <field name="MPN">CL21A226MAQNNNE</field>
+        <field name="Manufacturer">Samsung</field>
+      </fields>
+      <libsource lib="thermostat" part="C" description="CAP CER 22UF 25V X5R 0805"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="C3">
+      <value>100nF</value>
+      <footprint>Capacitor_SMD:C_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">GRM155R71C104KA88D</field>
+        <field name="Manufacturer">Murata</field>
+      </fields>
+      <libsource lib="thermostat" part="C" description="CAP CER 0.1UF 16V X7R 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="C13">
+      <value>100nF</value>
+      <footprint>Capacitor_SMD:C_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">GRM155R71C104KA88D</field>
+        <field name="Manufacturer">Murata</field>
+      </fields>
+      <libsource lib="thermostat" part="C" description="CAP CER 0.1UF 16V X7R 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="R5">
+      <value>33.2k</value>
+      <footprint>Resistor_SMD:R_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">RC0402FR-0733K2L</field>
+        <field name="Manufacturer">Yageo</field>
+      </fields>
+      <libsource lib="thermostat" part="R" description="RES SMD 33.2k 1% 1/16W 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="R6">
+      <value>10k</value>
+      <footprint>Resistor_SMD:R_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">RC0402FR-0710KL</field>
+        <field name="Manufacturer">Yageo</field>
+      </fields>
+      <libsource lib="thermostat" part="R" description="RES SMD 10k 1% 1/16W 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="U4">
+      <value>STM32G071KBU6</value>
+      <footprint>Package_DFN_QFN:QFN-32-1EP_5x5mm_P0.5mm_EP3.45x3.45mm</footprint>
+      <fields>
+        <field name="MPN">STM32G071KBU6</field>
+        <field name="Manufacturer">STMicroelectronics</field>
+      </fields>
+      <libsource lib="thermostat" part="STM32G071KBUx" description="IC MCU 32BIT 128KB FLASH 32UFQFPN"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="C4">
+      <value>100nF</value>
+      <footprint>Capacitor_SMD:C_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">GRM155R71C104KA88D</field>
+        <field name="Manufacturer">Murata</field>
+      </fields>
+      <libsource lib="thermostat" part="C" description="CAP CER 0.1UF 16V X7R 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="C5">
+      <value>100nF</value>
+      <footprint>Capacitor_SMD:C_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">GRM155R71C104KA88D</field>
+        <field name="Manufacturer">Murata</field>
+      </fields>
+      <libsource lib="thermostat" part="C" description="CAP CER 0.1UF 16V X7R 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="C6">
+      <value>100nF</value>
+      <footprint>Capacitor_SMD:C_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">GRM155R71C104KA88D</field>
+        <field name="Manufacturer">Murata</field>
+      </fields>
+      <libsource lib="thermostat" part="C" description="CAP CER 0.1UF 16V X7R 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="C41">
+      <value>1uF</value>
+      <footprint>Capacitor_SMD:C_0402_1005Metric</footprint>
+      <libsource lib="thermostat" part="C" description="CAP CER 1UF 10V X5R 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="R12">
+      <value>2.2k</value>
+      <footprint>Resistor_SMD:R_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">RC0402FR-072K2L</field>
+        <field name="Manufacturer">Yageo</field>
+      </fields>
+      <libsource lib="thermostat" part="R" description="RES SMD 2.2k 1% 1/16W 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="R13">
+      <value>2.2k</value>
+      <footprint>Resistor_SMD:R_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">RC0402FR-072K2L</field>
+        <field name="Manufacturer">Yageo</field>
+      </fields>
+      <libsource lib="thermostat" part="R" description="RES SMD 2.2k 1% 1/16W 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="U1">
+      <value>ESP32-C3-MINI-1-N4</value>
+      <footprint>RF_Module:ESP32-C3-MINI-1</footprint>
+      <fields>
+        <field name="MPN">ESP32-C3-MINI-1-N4</field>
+        <field name="Manufacturer">Espressif Systems</field>
+      </fields>
+      <libsource lib="thermostat" part="ESP32-C3-MINI-1" description="RF TXRX MOD WIFI/BT SMD 4MB"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="C8">
+      <value>10uF</value>
+      <footprint>Capacitor_SMD:C_0805_2012Metric</footprint>
+      <fields>
+        <field name="MPN">CL21A106KAYNNNE</field>
+        <field name="Manufacturer">Samsung</field>
+      </fields>
+      <libsource lib="thermostat" part="C" description="CAP CER 10UF 25V X5R 0805"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="C9">
+      <value>100nF</value>
+      <footprint>Capacitor_SMD:C_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">GRM155R71C104KA88D</field>
+        <field name="Manufacturer">Murata</field>
+      </fields>
+      <libsource lib="thermostat" part="C" description="CAP CER 0.1UF 16V X7R 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="J3">
+      <value>USB4105-GF-A</value>
+      <footprint>Connector_USB:USB_C_Receptacle_GCT_USB4105</footprint>
+      <fields>
+        <field name="MPN">USB4105-GF-A</field>
+        <field name="Manufacturer">GCT</field>
+      </fields>
+      <libsource lib="thermostat" part="USB_C_Receptacle_PowerOnly" description="CONN RCPT USB2.0 TYPE-C 16POS SMD"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="R14">
+      <value>5.1k</value>
+      <footprint>Resistor_SMD:R_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">RC0402FR-075K1L</field>
+        <field name="Manufacturer">Yageo</field>
+      </fields>
+      <libsource lib="thermostat" part="R" description="RES SMD 5.1k 1% 1/16W 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="R15">
+      <value>5.1k</value>
+      <footprint>Resistor_SMD:R_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">RC0402FR-075K1L</field>
+        <field name="Manufacturer">Yageo</field>
+      </fields>
+      <libsource lib="thermostat" part="R" description="RES SMD 5.1k 1% 1/16W 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="J2">
+      <value>FH12-24S-0.5SH(55)</value>
+      <footprint>Connector_FFC-FPC:Hirose_FH12-24S-0.5SH_1x24-1MP_P0.50mm_Horizontal</footprint>
+      <fields>
+        <field name="MPN">FH12-24S-0.5SH(55)</field>
+        <field name="Manufacturer">Hirose</field>
+      </fields>
+      <libsource lib="thermostat" part="FFC_24" description="CONN FFC BOTTOM 24POS 0.50MM R/A"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="D3">
+      <value>Green</value>
+      <footprint>LED_SMD:LED_0603_1608Metric</footprint>
+      <fields>
+        <field name="MPN">150060GS75000</field>
+        <field name="Manufacturer">Wurth Elektronik</field>
+      </fields>
+      <libsource lib="thermostat" part="LED" description="LED GREEN CLEAR 0603 SMD"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="D4">
+      <value>Red</value>
+      <footprint>LED_SMD:LED_0603_1608Metric</footprint>
+      <fields>
+        <field name="MPN">150060RS75000</field>
+        <field name="Manufacturer">Wurth Elektronik</field>
+      </fields>
+      <libsource lib="thermostat" part="LED" description="LED RED CLEAR 0603 SMD"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="R16">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">RC0402FR-071KL</field>
+        <field name="Manufacturer">Yageo</field>
+      </fields>
+      <libsource lib="thermostat" part="R" description="RES SMD 1k 1% 1/16W 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+    <comp ref="R17">
+      <value>1k</value>
+      <footprint>Resistor_SMD:R_0402_1005Metric</footprint>
+      <fields>
+        <field name="MPN">RC0402FR-071KL</field>
+        <field name="Manufacturer">Yageo</field>
+      </fields>
+      <libsource lib="thermostat" part="R" description="RES SMD 1k 1% 1/16W 0402"/>
+      <sheetpath names="/" tstamps="/"/>
+    </comp>
+  </components>
+  <libparts>
+    <libpart lib="thermostat" part="TerminalBlock_2">
+      <description>TERM BLK 2POS SIDE ENTRY 5.08MM PCB</description>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="Fuse">
+      <description>FUSE BRD MNT 1A 250VAC RADIAL TR5</description>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="Varistor">
+      <description>VARISTOR 430V 1.2KA DISC 7MM</description>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="RAC02-05SK">
+      <description>AC/DC CONVERTER 5V 2W SIP-4</description>
+      <pins>
+        <pin num="1" name="AC/L" type="power_in"/>
+        <pin num="2" name="AC/N" type="power_in"/>
+        <pin num="3" name="+VOUT" type="power_out"/>
+        <pin num="4" name="-VOUT" type="power_out"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="Relay_SPST">
+      <description>RELAY GEN PURPOSE SPST 5A 5V</description>
+      <pins>
+        <pin num="1" name="A1" type="passive"/>
+        <pin num="2" name="A2" type="passive"/>
+        <pin num="3" name="COM" type="passive"/>
+        <pin num="4" name="NO" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="TerminalBlock_3">
+      <description>TERM BLK 3POS SIDE ENTRY 5.08MM PCB</description>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+        <pin num="3" name="3" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="Q_NPN_BEC">
+      <description>TRANS NPN 40V 0.2A SOT23</description>
+      <pins>
+        <pin num="1" name="B" type="passive"/>
+        <pin num="2" name="E" type="passive"/>
+        <pin num="3" name="C" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="D">
+      <description>DIODE GEN PURP 100V 300MA SOD123</description>
+      <pins>
+        <pin num="1" name="K" type="passive"/>
+        <pin num="2" name="A" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="R">
+      <description>RES SMD 1k 1% 1/16W 0402</description>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="TPS562201">
+      <description>IC REG BUCK ADJ 2A SOT23-6</description>
+      <pins>
+        <pin num="1" name="GND" type="power_in"/>
+        <pin num="2" name="SW" type="power_out"/>
+        <pin num="3" name="VIN" type="power_in"/>
+        <pin num="4" name="VFB" type="input"/>
+        <pin num="5" name="EN" type="input"/>
+        <pin num="6" name="VBST" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="L">
+      <description>FIXED IND 2.2UH 5.5A 35 MOHM SMD</description>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="C">
+      <description>CAP CER 10UF 25V X5R 0805</description>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="STM32G071KBUx">
+      <description>IC MCU 32BIT 128KB FLASH 32UFQFPN</description>
+      <pins>
+        <pin num="1" name="PB9" type="bidirectional"/>
+        <pin num="2" name="PC14-OSC32_IN" type="bidirectional"/>
+        <pin num="3" name="PC15-OSC32_OUT" type="bidirectional"/>
+        <pin num="4" name="VDD/VDDA" type="power_in"/>
+        <pin num="5" name="VSS/VSSA" type="power_in"/>
+        <pin num="6" name="PF2-NRST" type="bidirectional"/>
+        <pin num="7" name="PA0" type="bidirectional"/>
+        <pin num="8" name="PA1" type="bidirectional"/>
+        <pin num="9" name="PA2" type="bidirectional"/>
+        <pin num="10" name="PA3" type="bidirectional"/>
+        <pin num="11" name="PA4" type="bidirectional"/>
+        <pin num="12" name="PA5" type="bidirectional"/>
+        <pin num="13" name="PA6" type="bidirectional"/>
+        <pin num="14" name="PA7" type="bidirectional"/>
+        <pin num="15" name="PB0" type="bidirectional"/>
+        <pin num="16" name="PB1" type="bidirectional"/>
+        <pin num="17" name="PB2" type="bidirectional"/>
+        <pin num="18" name="PA8" type="bidirectional"/>
+        <pin num="19" name="PA9" type="bidirectional"/>
+        <pin num="20" name="PC6" type="bidirectional"/>
+        <pin num="21" name="PA10" type="bidirectional"/>
+        <pin num="22" name="PA11" type="bidirectional"/>
+        <pin num="23" name="PA12" type="bidirectional"/>
+        <pin num="24" name="PA13" type="bidirectional"/>
+        <pin num="25" name="PA14-BOOT0" type="bidirectional"/>
+        <pin num="26" name="PA15" type="bidirectional"/>
+        <pin num="27" name="PB3" type="bidirectional"/>
+        <pin num="28" name="PB4" type="bidirectional"/>
+        <pin num="29" name="PB5" type="bidirectional"/>
+        <pin num="30" name="PB6" type="bidirectional"/>
+        <pin num="31" name="PB7" type="bidirectional"/>
+        <pin num="32" name="PB8" type="bidirectional"/>
+        <pin num="33" name="VSS" type="power_in"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="ESP32-C3-MINI-1">
+      <description>RF TXRX MOD WIFI/BT SMD 4MB</description>
+      <pins>
+        <pin num="1" name="GND" type="power_in"/>
+        <pin num="2" name="GND" type="power_in"/>
+        <pin num="11" name="GND" type="power_in"/>
+        <pin num="14" name="GND" type="power_in"/>
+        <pin num="36" name="GND" type="power_in"/>
+        <pin num="37" name="GND" type="power_in"/>
+        <pin num="38" name="GND" type="power_in"/>
+        <pin num="39" name="GND" type="power_in"/>
+        <pin num="40" name="GND" type="power_in"/>
+        <pin num="41" name="GND" type="power_in"/>
+        <pin num="42" name="GND" type="power_in"/>
+        <pin num="43" name="GND" type="power_in"/>
+        <pin num="44" name="GND" type="power_in"/>
+        <pin num="45" name="GND" type="power_in"/>
+        <pin num="46" name="GND" type="power_in"/>
+        <pin num="47" name="GND" type="power_in"/>
+        <pin num="48" name="GND" type="power_in"/>
+        <pin num="49" name="GND" type="power_in"/>
+        <pin num="50" name="GND" type="power_in"/>
+        <pin num="51" name="GND" type="power_in"/>
+        <pin num="52" name="GND" type="power_in"/>
+        <pin num="53" name="GND" type="power_in"/>
+        <pin num="3" name="3V3" type="power_in"/>
+        <pin num="5" name="IO2" type="bidirectional"/>
+        <pin num="6" name="IO3" type="bidirectional"/>
+        <pin num="8" name="EN" type="input"/>
+        <pin num="12" name="IO0" type="bidirectional"/>
+        <pin num="13" name="IO1" type="bidirectional"/>
+        <pin num="16" name="IO10" type="bidirectional"/>
+        <pin num="18" name="IO4" type="bidirectional"/>
+        <pin num="19" name="IO5" type="bidirectional"/>
+        <pin num="20" name="IO6" type="bidirectional"/>
+        <pin num="21" name="IO7" type="bidirectional"/>
+        <pin num="22" name="IO8" type="bidirectional"/>
+        <pin num="23" name="IO9" type="bidirectional"/>
+        <pin num="26" name="IO18" type="bidirectional"/>
+        <pin num="27" name="IO19" type="bidirectional"/>
+        <pin num="30" name="RXD0" type="input"/>
+        <pin num="31" name="TXD0" type="output"/>
+        <pin num="4" name="NC" type="no_connect"/>
+        <pin num="7" name="NC" type="no_connect"/>
+        <pin num="9" name="NC" type="no_connect"/>
+        <pin num="10" name="NC" type="no_connect"/>
+        <pin num="15" name="NC" type="no_connect"/>
+        <pin num="17" name="NC" type="no_connect"/>
+        <pin num="24" name="NC" type="no_connect"/>
+        <pin num="25" name="NC" type="no_connect"/>
+        <pin num="28" name="NC" type="no_connect"/>
+        <pin num="29" name="NC" type="no_connect"/>
+        <pin num="32" name="NC" type="no_connect"/>
+        <pin num="33" name="NC" type="no_connect"/>
+        <pin num="34" name="NC" type="no_connect"/>
+        <pin num="35" name="NC" type="no_connect"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="USB_C_Receptacle_PowerOnly">
+      <description>CONN RCPT USB2.0 TYPE-C 16POS SMD</description>
+      <pins>
+        <pin num="A1" name="GND" type="passive"/>
+        <pin num="B1" name="GND" type="passive"/>
+        <pin num="A4" name="VBUS" type="passive"/>
+        <pin num="B4" name="VBUS" type="passive"/>
+        <pin num="A5" name="CC1" type="bidirectional"/>
+        <pin num="B5" name="CC2" type="bidirectional"/>
+        <pin num="S1" name="SHIELD" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="FFC_24">
+      <description>CONN FFC BOTTOM 24POS 0.50MM R/A</description>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+        <pin num="3" name="3" type="passive"/>
+        <pin num="4" name="4" type="passive"/>
+        <pin num="5" name="5" type="passive"/>
+        <pin num="6" name="6" type="passive"/>
+        <pin num="7" name="7" type="passive"/>
+        <pin num="8" name="8" type="passive"/>
+        <pin num="9" name="9" type="passive"/>
+        <pin num="10" name="10" type="passive"/>
+        <pin num="11" name="11" type="passive"/>
+        <pin num="12" name="12" type="passive"/>
+        <pin num="13" name="13" type="passive"/>
+        <pin num="14" name="14" type="passive"/>
+        <pin num="15" name="15" type="passive"/>
+        <pin num="16" name="16" type="passive"/>
+        <pin num="17" name="17" type="passive"/>
+        <pin num="18" name="18" type="passive"/>
+        <pin num="19" name="19" type="passive"/>
+        <pin num="20" name="20" type="passive"/>
+        <pin num="21" name="21" type="passive"/>
+        <pin num="22" name="22" type="passive"/>
+        <pin num="23" name="23" type="passive"/>
+        <pin num="24" name="24" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="thermostat" part="LED">
+      <description>LED GREEN CLEAR 0603 SMD</description>
+      <pins>
+        <pin num="1" name="K" type="passive"/>
+        <pin num="2" name="A" type="passive"/>
+      </pins>
+    </libpart>
+  </libparts>
+  <nets>
+    <net code="1" name="/AC_L">
+      <node ref="J1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="F1" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="2" name="/AC_LF">
+      <node ref="F1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="RV1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="PS1" pin="1" pinfunction="AC/L" pintype="power_in"/>
+      <node ref="K1" pin="3" pinfunction="COM" pintype="passive"/>
+      <node ref="K2" pin="3" pinfunction="COM" pintype="passive"/>
+      <node ref="J4" pin="2" pinfunction="2" pintype="passive"/>
+    </net>
+    <net code="3" name="/AC_N">
+      <node ref="J1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="RV1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="PS1" pin="2" pinfunction="AC/N" pintype="power_in"/>
+    </net>
+    <net code="4" name="/OUT1">
+      <node ref="K1" pin="4" pinfunction="NO" pintype="passive"/>
+      <node ref="J4" pin="3" pinfunction="3" pintype="passive"/>
+    </net>
+    <net code="5" name="/OUT2">
+      <node ref="K2" pin="4" pinfunction="NO" pintype="passive"/>
+      <node ref="J4" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="6" name="/GND">
+      <node ref="PS1" pin="4" pinfunction="-VOUT" pintype="power_out"/>
+      <node ref="Q1" pin="2" pinfunction="E" pintype="passive"/>
+      <node ref="Q2" pin="2" pinfunction="E" pintype="passive"/>
+      <node ref="U7" pin="1" pinfunction="GND" pintype="power_in"/>
+      <node ref="C1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C2" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C3" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R6" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="5" pinfunction="VSS/VSSA" pintype="power_in"/>
+      <node ref="U4" pin="33" pinfunction="VSS" pintype="power_in"/>
+      <node ref="C4" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C5" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C6" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C41" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C8" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C9" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="J3" pin="A1" pinfunction="GND" pintype="passive"/>
+      <node ref="J3" pin="B1" pinfunction="GND" pintype="passive"/>
+      <node ref="J3" pin="S1" pinfunction="SHIELD" pintype="passive"/>
+      <node ref="R14" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R15" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="J2" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J2" pin="24" pinfunction="24" pintype="passive"/>
+      <node ref="D3" pin="1" pinfunction="K" pintype="passive"/>
+      <node ref="D4" pin="1" pinfunction="K" pintype="passive"/>
+      <node ref="U1" pin="1" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="2" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="11" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="14" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="36" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="37" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="38" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="39" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="40" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="41" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="42" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="43" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="44" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="45" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="46" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="47" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="48" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="49" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="50" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="51" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="52" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="53" pinfunction="GND" pintype="power_in"/>
+    </net>
+    <net code="7" name="/5V">
+      <node ref="PS1" pin="3" pinfunction="+VOUT" pintype="power_out"/>
+      <node ref="K1" pin="1" pinfunction="A1" pintype="passive"/>
+      <node ref="K2" pin="1" pinfunction="A1" pintype="passive"/>
+      <node ref="D1" pin="1" pinfunction="K" pintype="passive"/>
+      <node ref="D2" pin="1" pinfunction="K" pintype="passive"/>
+      <node ref="U7" pin="3" pinfunction="VIN" pintype="power_in"/>
+      <node ref="U7" pin="5" pinfunction="EN" pintype="input"/>
+      <node ref="C1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C3" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J3" pin="A4" pinfunction="VBUS" pintype="passive"/>
+      <node ref="J3" pin="B4" pinfunction="VBUS" pintype="passive"/>
+    </net>
+    <net code="8" name="/3V3">
+      <node ref="L1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C2" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R5" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="U4" pin="4" pinfunction="VDD/VDDA" pintype="power_in"/>
+      <node ref="C4" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C5" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C6" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C41" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="U1" pin="3" pinfunction="3V3" pintype="power_in"/>
+      <node ref="U1" pin="8" pinfunction="EN" pintype="input"/>
+      <node ref="C8" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C9" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R12" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R13" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J2" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="J2" pin="3" pinfunction="3" pintype="passive"/>
+    </net>
+    <net code="9" name="/SW">
+      <node ref="U7" pin="2" pinfunction="SW" pintype="power_out"/>
+      <node ref="L1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C13" pin="2" pinfunction="2" pintype="passive"/>
+    </net>
+    <net code="10" name="/BST">
+      <node ref="U7" pin="6" pinfunction="VBST" pintype="passive"/>
+      <node ref="C13" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="11" name="/FB">
+      <node ref="U7" pin="4" pinfunction="VFB" pintype="input"/>
+      <node ref="R5" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R6" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="12" name="/RLY1">
+      <node ref="K1" pin="2" pinfunction="A2" pintype="passive"/>
+      <node ref="D1" pin="2" pinfunction="A" pintype="passive"/>
+      <node ref="Q1" pin="3" pinfunction="C" pintype="passive"/>
+    </net>
+    <net code="13" name="/RLY2">
+      <node ref="K2" pin="2" pinfunction="A2" pintype="passive"/>
+      <node ref="D2" pin="2" pinfunction="A" pintype="passive"/>
+      <node ref="Q2" pin="3" pinfunction="C" pintype="passive"/>
+    </net>
+    <net code="14" name="/RLY1_B">
+      <node ref="Q1" pin="1" pinfunction="B" pintype="passive"/>
+      <node ref="R1" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="15" name="/RLY2_B">
+      <node ref="Q2" pin="1" pinfunction="B" pintype="passive"/>
+      <node ref="R2" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="16" name="/RLY1_EN">
+      <node ref="R1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="7" pinfunction="PA0" pintype="bidirectional"/>
+    </net>
+    <net code="17" name="/RLY2_EN">
+      <node ref="R2" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="8" pinfunction="PA1" pintype="bidirectional"/>
+    </net>
+    <net code="18" name="/I2C_SCL">
+      <node ref="R12" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="32" pinfunction="PB8" pintype="bidirectional"/>
+      <node ref="J2" pin="5" pinfunction="5" pintype="passive"/>
+    </net>
+    <net code="19" name="/I2C_SDA">
+      <node ref="R13" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="1" pinfunction="PB9" pintype="bidirectional"/>
+      <node ref="J2" pin="6" pinfunction="6" pintype="passive"/>
+    </net>
+    <net code="20" name="/UART_TX">
+      <node ref="U4" pin="30" pinfunction="PB6" pintype="bidirectional"/>
+      <node ref="U1" pin="30" pinfunction="RXD0" pintype="input"/>
+    </net>
+    <net code="21" name="/UART_RX">
+      <node ref="U4" pin="31" pinfunction="PB7" pintype="bidirectional"/>
+      <node ref="U1" pin="31" pinfunction="TXD0" pintype="output"/>
+    </net>
+    <net code="22" name="/CC1">
+      <node ref="J3" pin="A5" pinfunction="CC1" pintype="bidirectional"/>
+      <node ref="R14" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="23" name="/CC2">
+      <node ref="J3" pin="B5" pinfunction="CC2" pintype="bidirectional"/>
+      <node ref="R15" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="24" name="/LED_G">
+      <node ref="D3" pin="2" pinfunction="A" pintype="passive"/>
+      <node ref="R16" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="25" name="/LED_R">
+      <node ref="D4" pin="2" pinfunction="A" pintype="passive"/>
+      <node ref="R17" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="26" name="/LED_GA">
+      <node ref="R16" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="12" pinfunction="PA5" pintype="bidirectional"/>
+    </net>
+    <net code="27" name="/LED_RA">
+      <node ref="R17" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="13" pinfunction="PA6" pintype="bidirectional"/>
+    </net>
+    <net code="28" name="/NRST">
+      <node ref="U4" pin="6" pinfunction="PF2-NRST" pintype="bidirectional"/>
+    </net>
+    <net code="29" name="/SWDIO">
+      <node ref="U4" pin="24" pinfunction="PA13" pintype="bidirectional"/>
+    </net>
+    <net code="30" name="/SWCLK">
+      <node ref="U4" pin="25" pinfunction="PA14-BOOT0" pintype="bidirectional"/>
+    </net>
+  </nets>
+</export>

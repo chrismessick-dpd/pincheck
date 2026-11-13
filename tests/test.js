@@ -1,0 +1,95 @@
+// Pincheck tests: open tests/test.html over http. The page title becomes PASS, FAIL, or ERROR.
+(async function () {
+  'use strict';
+  const PK = window.PK, P = PK.params, L = PK.library, D = PK.design;
+  const out = [], fails = [], tests = [];
+  const t = (name, fn) => tests.push([name, fn]);
+  const eq = (a, b, msg) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error((msg ? msg + ': ' : '') + 'expected ' + JSON.stringify(b) + ', got ' + JSON.stringify(a)); };
+  const ok = (c, msg) => { if (!c) throw new Error(msg || 'not true'); };
+
+  const xml = await (await fetch('../demo/thermostat-main-pcba.xml', { cache: 'no-store' })).text();
+  const lib = await Promise.all(['stm32g071kbu6', 'tps562201ddcr'].map(async n => (await fetch('../demo/library/' + n + '.json', { cache: 'no-store' })).json()));
+  const design = await D.build([new File([xml], 'thermostat-main-pcba.xml')]);
+
+  t('numbers: SI prefixes, units, and R/V notation', () => {
+    eq(P.parseNum('100n'), 1e-7); eq(P.parseNum('4.7 µF', 'F'), 4.7e-6); eq(P.parseNum('3V3'), 3.3); eq(P.parseNum('4k7'), 4700);
+    eq(P.parseNum('500 nA/V', 'A/V'), 5e-7); eq(P.parseNum('48 MHz', 'Hz'), 48e6); eq(P.parseNum('VDD+0.3'), null); eq(P.parseNum(''), null);
+  });
+  t('numbers: shown with prefixes', () => { eq(P.fmt(1e-7, 'F'), '100 nF'); eq(P.fmt(48e6, 'Hz'), '48 MHz'); eq(P.fmt(-40, '°C'), '-40 °C'); eq(P.fmt(3.6, 'V'), '3.6 V'); });
+  t('catalog: unique keys, units, and shapes', () => {
+    const ks = P.CATALOG.map(c => c.k);
+    eq(ks.filter((k, i) => ks.indexOf(k) !== i), []);
+    ok(ks.length >= 190, 'catalog has ' + ks.length + ' keys');
+    for (const c of P.CATALOG) { ok(['range', 'value', 'text', 'list'].includes(c.shape), c.k + ' shape'); ok(['part', 'domain', 'pin'].includes(c.on), c.k + ' on'); }
+    ok(P.forKind('regulator').some(c => c.k === 'reg.vref') && !P.forKind('resistor').some(c => c.k === 'reg.vref'));
+  });
+  t('KiCad netlist: parts, pins, and nets', () => {
+    eq(design.source, 'kicad'); eq(design.parts.length, 39); eq(design.nets.length, 30);
+    const u4 = design.parts.find(p => p.ref === 'U4');
+    eq(u4.pins.length, 33); eq(u4.pins.find(p => p.num === '4').name, 'VDD/VDDA'); eq(u4.pins.find(p => p.num === '4').type, 'power');
+    eq(design.nets.find(n => n.name === '3V3').nodes.some(n => n.ref === 'U4' && n.pin === '4'), true);
+  });
+  t('part numbers and kinds', () => {
+    const u7 = design.parts.find(p => p.ref === 'U7');
+    eq([u7.mpn, u7.mpnFrom, u7.kind], ['TPS562201DDCR', 'MPN', 'ic']);
+    eq(design.parts.find(p => p.ref === 'C41').mpn, '', 'C41 has no part number');
+    eq(design.parts.find(p => p.ref === 'R5').kind, 'resistor');
+    eq(D.groups(design, ['ic', 'crystal']).map(g => g.mpn).sort(), ['ESP32-C3-MINI-1-N4', 'RAC02-05SK', 'STM32G071KBU6', 'TPS562201DDCR']);
+  });
+  t('identify: Comment and library reference, as Altium vault parts carry them', () => {
+    eq(D.identify({ params: { Comment: 'TPS54331DR' }, libRef: '0f3a9c1d2e4b5a6978c0d1e2f3a4b5c' }).mpn, 'TPS54331DR');
+    eq(D.identify({ params: { Comment: '=Value' }, libRef: 'TPS25947xxRPW-Symbol-1' }).mpn, 'TPS25947xxRPW');
+    eq(D.identify({ params: { 'Manufacturer Part Number': 'X1', Comment: 'ABC123' }, libRef: '' }).mpn, 'X1');
+    eq(D.identify({ params: { Comment: '10k' }, libRef: '9d8c7b6a5f4e3d2c1b0a99887766554' }).mpn, '');
+  });
+  t('library: files match by part number and pattern', () => {
+    eq(L.find(lib, 'STM32G071KBU6').id, 'stm32g071kbu6');
+    eq(L.find(lib, 'stm32g071k8u6').id, 'stm32g071kbu6', 'match list, any case');
+    eq(L.find(lib, 'TPS562201DDCT').id, 'tps562201ddcr');
+    eq(L.find(lib, 'TPS562208DDCR'), null);
+    eq(L.near(lib, 'TPS562201DDCRX').map(f => f.id), ['tps562201ddcr']);
+    ok(L.glob('STM32G071K?U6*').test('STM32G071KBU6TR'));
+  });
+  t('library: demo files are valid and agree with the schematic pins', () => {
+    for (const f of lib) { eq(L.validate(f), [], f.id); eq(L.pinCheck(f, design.parts.find(p => p.mpn === f.mpn)), [], f.id + ' pins'); }
+  });
+  t('library: pin check names differing pins', () => {
+    const f = JSON.parse(JSON.stringify(lib[1])); f.pins[3].name = 'EN'; f.pins.push({ num: '7', name: 'PAD' });
+    eq(L.pinCheck(f, design.parts.find(p => p.ref === 'U7')).map(m => m.num), ['4', '7']);
+  });
+  t('new file from the schematic: roles and domains guessed', () => {
+    const f = L.fromSchematic(design.parts.find(p => p.ref === 'U7'), 'test');
+    eq(f.kind, 'regulator');
+    eq(f.pins.map(p => p.role), ['ground', 'switch', 'power-in', 'feedback', 'enable', 'bootstrap']);
+    eq(f.domains, ['VIN']);
+    const m = L.fromSchematic(design.parts.find(p => p.ref === 'U4'), 'test');
+    eq(m.kind, 'mcu'); eq(m.pins.find(p => p.num === '6').role, 'reset'); eq(m.pins.find(p => p.num === '25').role, 'boot');
+    eq(m.pins.find(p => p.num === '7').domain, 'VDD');
+    eq(L.validate(m), []);
+    const e = L.fromSchematic(design.parts.find(p => p.ref === 'U1'), 'test');
+    eq(e.kind, 'module'); eq(e.domains, ['3V3']); eq(e.pins.find(p => p.num === '4').role, 'nc');
+  });
+  t('roles: regulator and op-amp outputs, grounds, and pads', () => {
+    eq(L.guessRole({ name: 'VOUT', type: 'power' }, 'regulator'), 'power-out');
+    eq(L.guessRole({ name: 'OUT', type: 'passive' }, 'analog'), 'analog');
+    eq(L.guessRole({ name: 'GNDISO', type: 'power' }, 'interface'), 'ground');
+    eq(L.guessRole({ name: 'EP', type: 'passive' }, 'regulator'), 'pad');
+    eq(L.guessRole({ name: 'BOOT', type: 'passive' }, 'regulator'), 'bootstrap');
+    eq(L.guessRole({ name: 'PA14-BOOT0', type: 'io' }, 'mcu'), 'boot');
+  });
+  t('validate: catches bad files', () => {
+    ok(L.validate({}).length > 0);
+    ok(L.validate(Object.assign({}, lib[0], { values: [{ k: 'supply.range', min: 1, unit: 'A' }] })).some(e => /unit/.test(e)));
+    ok(L.validate(Object.assign({}, lib[0], { pins: [{ num: '1', role: 'banana' }] })).some(e => /role/.test(e)));
+  });
+  t('XML reader: entities and CDATA', () => {
+    const d = PK.kicad.xml('<a x="1 &amp; 2"><b>&lt;3</b><![CDATA[<raw>]]></a>');
+    eq(d.kids[0].attrs.x, '1 & 2'); eq(d.kids[0].kids[0].text, '<3'); eq(d.kids[0].text, '<raw>');
+  });
+
+  for (const [name, fn] of tests) {
+    try { await fn(); out.push('✓ ' + name); } catch (e) { fails.push(name); out.push('✕ ' + name + '\n    ' + e.message); }
+  }
+  document.getElementById('out').textContent = out.join('\n') + '\n\n' + (tests.length - fails.length) + ' of ' + tests.length + ' passed';
+  document.title = fails.length ? 'FAIL' : 'PASS';
+})().catch(e => { document.getElementById('out').textContent = 'ERROR ' + e.stack; document.title = 'ERROR'; });

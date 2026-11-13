@@ -1,0 +1,336 @@
+{
+  "schema": "pincheck.part/1",
+  "id": "stm32g071kbu6",
+  "mpn": "STM32G071KBU6",
+  "match": [
+    "STM32G071K8U6",
+    "STM32G071K6U6"
+  ],
+  "manufacturer": "STMicroelectronics",
+  "kind": "mcu",
+  "description": "Arm Cortex-M0+ MCU, 128 KB flash, 36 KB RAM, UFQFPN32",
+  "package": "UFQFPN32",
+  "datasheet": {
+    "title": "STM32G071x8/xB datasheet",
+    "rev": "DS12232",
+    "url": "https://www.st.com/resource/en/datasheet/stm32g071kb.pdf",
+    "sha256": ""
+  },
+  "pins": [
+    {
+      "num": "1",
+      "name": "PB9",
+      "role": "io",
+      "domain": "VDD",
+      "functions": [
+        "I2C1_SDA AF6",
+        "USART3_RX AF4",
+        "EXTI9"
+      ]
+    },
+    {
+      "num": "2",
+      "name": "PC14-OSC32_IN",
+      "role": "clock-in",
+      "domain": "VDD"
+    },
+    {
+      "num": "3",
+      "name": "PC15-OSC32_OUT",
+      "role": "clock-out",
+      "domain": "VDD"
+    },
+    {
+      "num": "4",
+      "name": "VDD/VDDA",
+      "role": "power-in",
+      "domain": "VDD"
+    },
+    {
+      "num": "5",
+      "name": "VSS/VSSA",
+      "role": "ground"
+    },
+    {
+      "num": "6",
+      "name": "PF2-NRST",
+      "role": "reset",
+      "domain": "VDD"
+    },
+    {
+      "num": "7",
+      "name": "PA0",
+      "role": "io",
+      "domain": "VDD",
+      "functions": [
+        "ADC1_IN0",
+        "USART2_CTS AF1",
+        "EXTI0"
+      ]
+    },
+    {
+      "num": "8",
+      "name": "PA1",
+      "role": "io",
+      "domain": "VDD",
+      "functions": [
+        "ADC1_IN1",
+        "USART2_RTS AF1",
+        "EXTI1"
+      ]
+    },
+    {
+      "num": "9",
+      "name": "PA2",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "10",
+      "name": "PA3",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "11",
+      "name": "PA4",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "12",
+      "name": "PA5",
+      "role": "io",
+      "domain": "VDD",
+      "functions": [
+        "ADC1_IN5",
+        "SPI1_SCK AF0",
+        "EXTI5"
+      ]
+    },
+    {
+      "num": "13",
+      "name": "PA6",
+      "role": "io",
+      "domain": "VDD",
+      "functions": [
+        "ADC1_IN6",
+        "SPI1_MISO AF0",
+        "EXTI6"
+      ]
+    },
+    {
+      "num": "14",
+      "name": "PA7",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "15",
+      "name": "PB0",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "16",
+      "name": "PB1",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "17",
+      "name": "PB2",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "18",
+      "name": "PA8",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "19",
+      "name": "PA9",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "20",
+      "name": "PC6",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "21",
+      "name": "PA10",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "22",
+      "name": "PA11",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "23",
+      "name": "PA12",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "24",
+      "name": "PA13",
+      "role": "io",
+      "domain": "VDD",
+      "functions": [
+        "SWDIO AF0",
+        "EXTI13"
+      ]
+    },
+    {
+      "num": "25",
+      "name": "PA14-BOOT0",
+      "role": "boot",
+      "domain": "VDD",
+      "functions": [
+        "SWCLK AF0",
+        "BOOT0",
+        "EXTI14"
+      ]
+    },
+    {
+      "num": "26",
+      "name": "PA15",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "27",
+      "name": "PB3",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "28",
+      "name": "PB4",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "29",
+      "name": "PB5",
+      "role": "io",
+      "domain": "VDD"
+    },
+    {
+      "num": "30",
+      "name": "PB6",
+      "role": "io",
+      "domain": "VDD",
+      "functions": [
+        "USART1_TX AF0",
+        "I2C1_SCL AF6",
+        "EXTI6"
+      ]
+    },
+    {
+      "num": "31",
+      "name": "PB7",
+      "role": "io",
+      "domain": "VDD",
+      "functions": [
+        "USART1_RX AF0",
+        "I2C1_SDA AF6",
+        "EXTI7"
+      ]
+    },
+    {
+      "num": "32",
+      "name": "PB8",
+      "role": "io",
+      "domain": "VDD",
+      "functions": [
+        "I2C1_SCL AF6",
+        "USART3_TX AF4",
+        "EXTI8"
+      ]
+    },
+    {
+      "num": "33",
+      "name": "VSS",
+      "role": "pad"
+    }
+  ],
+  "domains": [
+    "VDD"
+  ],
+  "values": [
+    {
+      "k": "supply.range",
+      "on": "VDD",
+      "min": 1.7,
+      "max": 3.6,
+      "unit": "V",
+      "src": "import:cubemx",
+      "ok": {
+        "by": "@demo-reviewer",
+        "at": "2026-11-10T15:00:00Z"
+      }
+    },
+    {
+      "k": "supply.absmax",
+      "on": "VDD",
+      "value": 4.0,
+      "unit": "V",
+      "src": "datasheet"
+    },
+    {
+      "k": "io.vih",
+      "on": "VDD",
+      "value": "0.7*VDD",
+      "unit": "V",
+      "src": "datasheet"
+    },
+    {
+      "k": "io.vil",
+      "on": "VDD",
+      "value": "0.3*VDD",
+      "unit": "V",
+      "src": "datasheet"
+    },
+    {
+      "k": "clk.fmax",
+      "value": 64000000.0,
+      "unit": "Hz",
+      "src": "import:cubemx",
+      "ok": {
+        "by": "@demo-reviewer",
+        "at": "2026-11-10T15:00:00Z"
+      }
+    },
+    {
+      "k": "temp.range",
+      "min": -40,
+      "max": 125,
+      "cond": "The family; suffix 6 is -40 to 85 °C",
+      "unit": "°C",
+      "src": "import:cubemx"
+    },
+    {
+      "k": "dec.c",
+      "on": "VDD",
+      "value": 1e-07,
+      "unit": "F",
+      "src": "datasheet",
+      "note": "Plus bulk on the board"
+    }
+  ],
+  "made": {
+    "by": "@demo-reviewer",
+    "at": "2026-11-10T14:00:00Z",
+    "how": "import:cubemx, then by hand"
+  },
+  "updated": "2026-11-10T15:00:00Z"
+}

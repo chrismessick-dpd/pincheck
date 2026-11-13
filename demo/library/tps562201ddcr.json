@@ -1,0 +1,101 @@
+{
+  "schema": "pincheck.part/1",
+  "id": "tps562201ddcr",
+  "mpn": "TPS562201DDCR",
+  "match": [
+    "TPS562201DDCT"
+  ],
+  "manufacturer": "Texas Instruments",
+  "kind": "regulator",
+  "description": "4.5-V to 17-V input, 2-A synchronous step-down converter, SOT-23-6",
+  "package": "SOT-23-6 (DDC)",
+  "datasheet": {
+    "title": "TPS56220x 4.5-V to 17-V Input, 2-A Synchronous Step-Down Voltage Regulator",
+    "rev": "SLVSCZ1",
+    "url": "https://www.ti.com/lit/ds/symlink/tps562201.pdf",
+    "sha256": ""
+  },
+  "pins": [
+    {
+      "num": "1",
+      "name": "GND",
+      "role": "ground"
+    },
+    {
+      "num": "2",
+      "name": "SW",
+      "role": "switch"
+    },
+    {
+      "num": "3",
+      "name": "VIN",
+      "role": "power-in",
+      "domain": "VIN"
+    },
+    {
+      "num": "4",
+      "name": "VFB",
+      "role": "feedback"
+    },
+    {
+      "num": "5",
+      "name": "EN",
+      "role": "enable"
+    },
+    {
+      "num": "6",
+      "name": "VBST",
+      "role": "bootstrap"
+    }
+  ],
+  "domains": [
+    "VIN"
+  ],
+  "values": [
+    {
+      "k": "reg.topology",
+      "text": "Synchronous buck",
+      "unit": "",
+      "src": "datasheet"
+    },
+    {
+      "k": "reg.vin",
+      "min": 4.5,
+      "max": 17,
+      "unit": "V",
+      "src": "datasheet",
+      "ok": {
+        "by": "@demo-reviewer",
+        "at": "2026-11-10T15:00:00Z"
+      }
+    },
+    {
+      "k": "reg.vref",
+      "typ": 0.768,
+      "unit": "V",
+      "src": "datasheet",
+      "ok": {
+        "by": "@demo-reviewer",
+        "at": "2026-11-10T15:00:00Z"
+      }
+    },
+    {
+      "k": "reg.iout",
+      "value": 2,
+      "unit": "A",
+      "src": "datasheet"
+    },
+    {
+      "k": "reg.fsw",
+      "typ": 580000.0,
+      "unit": "Hz",
+      "src": "datasheet"
+    }
+  ],
+  "made": {
+    "by": "@demo-reviewer",
+    "at": "2026-11-10T14:30:00Z",
+    "how": "llm (pincheck-part skill), then checked"
+  },
+  "updated": "2026-11-10T15:10:00Z"
+}
