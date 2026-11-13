@@ -77,7 +77,7 @@ the suite's hard rules.
   `io.absmax.off`. Pushed `d045099`, then the variant picker and the 2.5 s scan `b2fe328`. See `docs/checks.md`, *Logic levels
   between parts*.
 
-- **Check with Claude and self-improve (2026-11-13, Chris; not committed):** a whole project handed to Claude beside
+- **Check with Claude and self-improve (2026-11-13, Chris; pushed `381a23d`):** a whole project handed to Claude beside
   the offline check, and what Claude finds made into offline checks. Everything is in `docs/claude-scan.md`.
   `tools/scan.js` runs the offline checks headless (Node, the page's own assets), writes the design as text for
   Claude, and moves scans to and from `pincheck_data` (`scans/<design>/<id>/`, new files only, dry run first). Skills:
