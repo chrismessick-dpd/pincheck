@@ -48,30 +48,62 @@
 
   const natural = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 
+  // A board designator's schematic part: "C1.2" (channel 2 of C1) is drawn as C1; also "C1_2".
+  const logicalOf = (ref, schematic) => {
+    if (schematic.has(ref)) return schematic.get(ref);
+    const m = /^(.+?)[._](\w+)$/.exec(ref);
+    return m && schematic.has(m[1]) ? schematic.get(m[1]) : null;
+  };
+
   async function build(files) {
     const sheets = [], notes = [];
-    const byRef = new Map();
-    let nets = null, source = '';
+    const schematic = new Map(); // parts from SchDoc sheets, by their schematic designator
+    const fromNetlist = new Map(); // parts from a netlist, by their board designator
+    let nets = null, netlist = '', kicad = false;
     for (const f of files) {
       const name = f.name;
       if (/\.schdoc$/i.test(name)) {
-        source = source && source !== 'altium' ? 'mixed' : 'altium';
         const r = PK.schdoc.parse(new Uint8Array(await f.arrayBuffer()), name);
         sheets.push(name);
         for (const p of r.parts) {
-          if (byRef.has(p.ref)) mergePart(byRef.get(p.ref), p);
-          else byRef.set(p.ref, p);
+          if (schematic.has(p.ref)) mergePart(schematic.get(p.ref), p);
+          else schematic.set(p.ref, p);
         }
       } else if (/\.(xml|net)$/i.test(name)) {
-        const text = await f.text();
-        if (!/<export[\s>]/.test(text)) { notes.push(name + ': not a KiCad XML netlist, skipped'); continue; }
-        source = source && source !== 'kicad' ? 'mixed' : 'kicad';
-        const r = PK.kicad.parse(text, name);
+        const text = PK.protel.decode(new Uint8Array(await f.arrayBuffer()));
+        let r;
+        if (/<export[\s>]/.test(text.slice(0, 4000))) { r = PK.kicad.parse(text, name); kicad = true; netlist = netlist || 'KiCad XML'; }
+        else if (PK.protel.sniff(text) === 2) { r = PK.protel.parse(text, name); netlist = netlist || 'Protel2'; }
+        else if (PK.protel.sniff(text) === 1) { notes.push(name + ': an older Protel netlist, which has no pin names. In Altium, export Design › Netlist For Project › Protel2.'); continue; }
+        else { notes.push(name + ': not a KiCad XML or Protel2 netlist, skipped'); continue; }
         sheets.push(name);
-        for (const p of r.parts) { if (byRef.has(p.ref)) mergePart(byRef.get(p.ref), p); else byRef.set(p.ref, p); }
+        for (const p of r.parts) { if (fromNetlist.has(p.ref)) mergePart(fromNetlist.get(p.ref), p); else fromNetlist.set(p.ref, p); }
         nets = (nets || []).concat(r.nets);
-      } else if (!/\.(prjpcb|prjpcbstructure|prjpcbvariants|bomdoc|outjob|intlib|pcbdoc|pcbdwf|schdot|harness)$/i.test(name)) notes.push(name + ': not a schematic or netlist, skipped');
+      } else if (!/\.(prjpcb|prjpcbstructure|prjpcbvariants|bomdoc|outjob|intlib|pcbdoc|pcbdwf|schdot|harness|edf|edif)$/i.test(name)) notes.push(name + ': not a schematic or netlist, skipped');
     }
+    // With a netlist, its parts (board designators, repeated channels expanded) are the design, and the
+    // sheets fill in what it lacks: pins on no net, and parameters. Without one, the sheets' parts are.
+    let byRef = schematic;
+    if (fromNetlist.size) {
+      byRef = fromNetlist;
+      let joined = 0;
+      if (schematic.size) {
+        for (const p of fromNetlist.values()) {
+          const s = logicalOf(p.ref, schematic);
+          if (!s) continue;
+          joined++;
+          const had = new Set(p.pins.map(x => x.num));
+          for (const pin of p.pins) { const sp = s.pins.find(x => x.num === pin.num); if (sp && (pin.type === 'passive' || !pin.name)) { pin.type = sp.type; if (!pin.name) pin.name = sp.name; } }
+          for (const pin of s.pins) if (!had.has(pin.num)) p.pins.push(Object.assign({ unconnected: true }, pin));
+          for (const [k, v] of Object.entries(s.params)) if (!(k in p.params)) p.params[k] = v;
+          if (!p.libRef) p.libRef = s.libRef;
+          p.designItemId = s.designItemId;
+          p.schRef = s.ref;
+        }
+        const unmatched = fromNetlist.size - joined;
+        if (unmatched) notes.push(unmatched + ' of the netlist\'s ' + fromNetlist.size + ' parts have no part on the sheets (by designator); their pins on no net aren\'t listed.');
+      } else if (!kicad) notes.push('From the netlist alone, pins on no net aren\'t listed. Drop the SchDoc sheets with it to fill them in.');
+    } else if (schematic.size) notes.push('No netlist: pins are listed without their connections. In Altium, export Design › Netlist For Project › Protel2, and drop it with the sheets.');
     const parts = [...byRef.values()].sort((a, b) => natural(a.ref, b.ref));
     for (const p of parts) {
       const id = identify(p);
@@ -79,12 +111,12 @@
       p.kind = classify(p);
       p.pins.sort((a, b) => natural(a.num, b.num));
     }
-    if (source === 'altium') notes.push('Nets aren\'t read from SchDoc files yet, so pins are listed without their connections.');
+    const source = netlist === 'KiCad XML' ? 'kicad' : schematic.size || netlist ? 'altium' : '';
     // The design's name: the Altium project's, if its .PrjPcb came along; else the one file's, or the top sheet's.
     const prj = files.find(f => /\.prjpcb$/i.test(f.name));
     const top = sheets.find(s => /top|main|root/i.test(s));
-    const base = prj ? prj.name.replace(/\.[^.]+$/, '') : files.length === 1 ? files[0].name.replace(/\.[^.]+$/, '') : top ? top.replace(/\.[^.]+$/, '') + ' (' + sheets.length + ' sheets)' : (sheets.length ? sheets.length + ' sheets' : 'Design');
-    return { name: base, source, sheets, parts, nets, notes };
+    const base = prj ? prj.name.replace(/\.[^.]+$/, '') : files.length === 1 ? files[0].name.replace(/\.[^.]+$/, '') : top ? top.replace(/\.[^.]+$/, '') + ' (' + sheets.length + ' files)' : (sheets.length ? sheets.length + ' files' : 'Design');
+    return { name: base, source, netlist, sheets, parts, nets, notes };
   }
 
   // Parts that share a part number, grouped: [{ mpn, refs, part, kind }], the ICs first.

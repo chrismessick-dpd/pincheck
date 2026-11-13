@@ -156,7 +156,7 @@
   function homePage() {
     return '<div class="page"><div class="eyebrow">Prototype</div><h1 class="page-title">Pincheck</h1>' +
       '<p class="pk-lede">Checks a schematic against what each part allows: supply ranges, I/O levels, pin functions, and more. It starts by finding the ICs and looking each one up in the part library. Parts it doesn\'t know yet get a part file, which you fill in by hand or with Claude from the datasheet.</p>' +
-      '<button class="card pk-drop" data-act="open"><span class="pk-drop-ico">' + ICON.drop + '</span><b>Drop schematic sheets or a netlist</b><span class="pk-muted">Altium .SchDoc (all the sheets of a project) or a KiCad XML netlist. Read in this tab and never uploaded.</span></button>' +
+      '<button class="card pk-drop" data-act="open"><span class="pk-drop-ico">' + ICON.drop + '</span><b>Drop schematic sheets or a netlist</b><span class="pk-muted">Altium: every .SchDoc of the project, with its Protel2 netlist (Design › Netlist For Project › Protel2) for the nets. KiCad: the XML netlist. Read in this tab and never uploaded.</span></button>' +
       (DEMO ? '' : '<div class="pk-demo-row"><a class="btn" href="?demo">Try the demo</a><span class="pk-muted">The made-up Smart Thermostat\'s Main PCBA, with a small library.</span></div>') +
       '<div class="grid grid-3" style="margin-top:22px">' +
       what('1. Find the parts', 'Every IC, crystal, and other active part, with its part number from the schematic\'s parameters, Comment, or library reference.') +
@@ -179,15 +179,15 @@
       const status = f
         ? '<span class="pk-st pk-st-ok">✓ In library</span><div class="pk-sub">' + s.verified + ' of ' + s.values + ' values verified</div>' + (mism ? '<div class="pk-sub pk-warn">▲ ' + mism + ' pin' + (mism === 1 ? '' : 's') + ' differ</div>' : '')
         : g.mpn ? '<span class="pk-st pk-st-miss">▲ Not in library</span>' : '<span class="pk-st pk-st-none">No part number</span>';
-      return '<tr><td>' + status + '</td><td class="pk-refs">' + esc(g.refs.join(', ')) + '</td>' +
+      return '<tr><td>' + status + '</td><td class="pk-refs"' + (g.refs.length > 8 ? ' title="' + esc(g.refs.join(', ')) + '"' : '') + '>' + esc(g.refs.length > 8 ? g.refs.slice(0, 6).join(', ') + ', … (' + g.refs.length + ')' : g.refs.join(', ')) + '</td>' +
         '<td><span class="pk-mono">' + esc(g.mpn || '—') + '</span>' + (g.part.mpnFrom ? '<div class="pk-sub">from ' + esc(g.part.mpnFrom) + '</div>' : '') +
         near.map(n => '<div class="pk-sub">Close to <span class="pk-mono">' + esc(n.mpn) + '</span> <button class="pk-link" data-alias="' + esc(n.id) + '" data-mpn="' + esc(g.mpn) + '">Use its file</button></div>').join('') + '</td>' +
         '<td class="pk-desc">' + esc(g.part.description || g.part.params.Value || '') + '</td><td class="pk-num">' + g.part.pins.length + '</td>' +
         '<td>' + (g.kind === 'ic' || g.kind === 'crystal' || f ? '<button class="btn btn-sm' + (f ? '' : ' btn-primary') + '" data-config="' + esc(g.part.ref) + '">' + (f ? 'Open' : 'Configure') + '</button>' : '') + '</td></tr>';
     }).join('');
     const missing = ics.filter(g => g.mpn && !L.find(state.lib, g.mpn));
-    return '<div class="page pk-wide"><div class="page-head"><div class="page-head-text"><div class="eyebrow">' + (d.source === 'kicad' ? 'KiCad netlist' : d.source === 'altium' ? 'Altium schematic' : 'Schematic') + '</div><h1 class="page-title">' + esc(d.name) + '</h1>' +
-      '<div class="page-sub"><span>' + d.sheets.length + ' file' + (d.sheets.length === 1 ? '' : 's') + '</span><span class="sep">·</span><span>' + d.parts.length + ' parts</span><span class="sep">·</span><span>' + (d.nets ? d.nets.length + ' nets' : 'nets not read yet') + '</span></div></div>' +
+    return '<div class="page pk-wide"><div class="page-head"><div class="page-head-text"><div class="eyebrow">' + (d.source === 'kicad' ? 'KiCad netlist' : d.source === 'altium' ? (d.netlist ? 'Altium schematic and Protel2 netlist' : 'Altium schematic') : 'Schematic') + '</div><h1 class="page-title">' + esc(d.name) + '</h1>' +
+      '<div class="page-sub"><span>' + d.sheets.length + ' file' + (d.sheets.length === 1 ? '' : 's') + '</span><span class="sep">·</span><span>' + d.parts.length + ' parts</span><span class="sep">·</span><span>' + (d.nets ? d.nets.length + ' nets' : 'no netlist yet') + '</span></div></div>' +
       '<div class="pk-head-actions">' + (missing.length ? '<button class="btn btn-primary" data-config="' + esc(missing[0].part.ref) + '">Configure next (' + missing.length + ' left)</button>' : '') + '</div></div>' +
       '<div class="grid grid-4 pk-stats">' + stat(known.length + ' / ' + ics.length, 'ICs and crystals in the library') + stat(missing.length, 'to configure', missing.length ? 'warn' : '') + stat(ics.filter(g => !g.mpn).length, 'without a part number') + stat(state.lib.length, 'part files in the library') + '</div>' +
       (d.notes.length ? '<div class="hint" style="margin-top:16px">' + d.notes.map(esc).join('<br>') + '</div>' : '') +

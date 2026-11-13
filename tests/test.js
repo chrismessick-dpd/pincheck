@@ -82,6 +82,40 @@
     ok(L.validate(Object.assign({}, lib[0], { values: [{ k: 'supply.range', min: 1, unit: 'A' }] })).some(e => /unit/.test(e)));
     ok(L.validate(Object.assign({}, lib[0], { pins: [{ num: '1', role: 'banana' }] })).some(e => /role/.test(e)));
   });
+  // A made-up Protel2 netlist in Altium's shape: a repeated channel (U2.1, U2.2), a part type with a dash,
+  // a pin name with a dash, Windows-1252 text, and a pin on no net (U1 pin 3).
+  const PROTEL = ['PROTEL NETLIST 2.0', '[', 'DESIGNATOR', 'U1', 'FOOTPRINT', 'SOT-23-5', 'PARTTYPE', 'TPS7A02-33', 'DESCRIPTION', 'LDO 3.3 V',
+    'Comment', 'TPS7A0233PDBVR', 'Max Operating Temperature', '125°C', 'PCB3D', '', '*', ']',
+    '[', 'DESIGNATOR', 'U2.1', 'FOOTPRINT', 'SOIC-8', 'PARTTYPE', 'TCAN1042', 'DESCRIPTION', 'CAN transceiver', ']',
+    '[', 'DESIGNATOR', 'U2.2', 'FOOTPRINT', 'SOIC-8', 'PARTTYPE', 'TCAN1042', 'DESCRIPTION', 'CAN transceiver', ']',
+    '(', '3V3', 'U1-5 TPS7A02-33-OUT Output      ', 'U2.1-3 TCAN1042-VCC Power   ', 'U2.2-3 TCAN1042-VCC Power', ')',
+    '(', 'CAN_H.1', 'U2.1-7 TCAN1042-CANH Passive', ')', '(', 'IN', 'U1-1 TPS7A02-33-IN-A Power', ')'].join('\r\n') + '\r\n';
+  t('Protel2 netlist: parts, channels, pin names, and types', () => {
+    eq(PK.protel.sniff(PROTEL), 2); eq(PK.protel.sniff('[\r\nC1\r\n0603\r\n'), 1);
+    const r = PK.protel.parse(PROTEL, 'x.NET');
+    eq(r.parts.map(p => p.ref), ['U1', 'U2.1', 'U2.2']); eq(r.nets.length, 3);
+    const u1 = r.parts[0];
+    eq(u1.params.Comment, 'TPS7A0233PDBVR'); eq(u1.params['Max Operating Temperature'], '125°C');
+    eq(u1.pins.map(p => [p.num, p.name, p.type]), [['5', 'OUT', 'output'], ['1', 'IN-A', 'power']]);
+    eq(r.nets[0].nodes, [{ ref: 'U1', pin: '5' }, { ref: 'U2.1', pin: '3' }, { ref: 'U2.2', pin: '3' }]);
+    const bytes = new Uint8Array([...'PROTEL NETLIST 2.0\r\n'].map(c => c.charCodeAt(0)).concat([0xB0]));
+    eq(PK.protel.decode(bytes).slice(-1), '°', 'Windows-1252');
+  });
+  t('Protel2 with sheets: board designators joined to schematic parts', async () => {
+    const sheetPart = { ref: 'U1', libRef: 'TPS7A02', description: '', params: { Comment: 'TPS7A0233PDBVR' }, sheets: ['a.SchDoc'],
+      pins: [{ num: '1', name: 'IN', type: 'power' }, { num: '3', name: 'EN', type: 'input' }, { num: '5', name: 'OUT', type: 'output' }] };
+    const real = PK.schdoc.parse;
+    PK.schdoc.parse = () => ({ sheet: 'a.SchDoc', parts: [sheetPart, Object.assign({}, sheetPart, { ref: 'U2', params: { Comment: 'TCAN1042VDRQ1' }, pins: [{ num: '8', name: 'S', type: 'input' }] })] });
+    try {
+      const d = await D.build([new File(['x'], 'a.SchDoc'), new File([PROTEL], 'x.NET')]);
+      eq([d.source, d.netlist, d.parts.length, d.nets.length], ['altium', 'Protel2', 3, 3]);
+      const u1 = d.parts.find(p => p.ref === 'U1');
+      eq(u1.pins.map(p => p.num + (p.unconnected ? '*' : '')), ['1', '3*', '5']);
+      eq(d.parts.find(p => p.ref === 'U2.2').schRef, 'U2');
+      eq(d.parts.find(p => p.ref === 'U2.2').pins.some(p => p.num === '8' && p.unconnected), true);
+      eq(D.groups(d, ['ic']).map(g => g.refs), [['U1'], ['U2.1', 'U2.2']]);
+    } finally { PK.schdoc.parse = real; }
+  });
   t('XML reader: entities and CDATA', () => {
     const d = PK.kicad.xml('<a x="1 &amp; 2"><b>&lt;3</b><![CDATA[<raw>]]></a>');
     eq(d.kids[0].attrs.x, '1 & 2'); eq(d.kids[0].kids[0].text, '<3'); eq(d.kids[0].text, '<raw>');

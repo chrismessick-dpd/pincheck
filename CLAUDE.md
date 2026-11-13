@@ -10,9 +10,9 @@ the suite's hard rules.
   the library, and configure them in a window; part files by hand or with an LLM, checked offline.
 - Repos: `chrismessick-dpd/pincheck` (public) and `chrismessick-dpd/pincheck_data` (private, the
   library under `parts/`). No other tool links to Pincheck yet (Chris).
-- Built: SchDoc and KiCad XML reading, part identification, the library (IndexedDB, sync), the part
+- Built: SchDoc, Protel2, and KiCad XML reading, part identification, the library (IndexedDB, sync), the part
   window, the 201-key catalog, the CubeMX importer, `tools/part.js`, the `pincheck-part` skill, the demo.
-- Not built: nets from SchDoc, the checks, zip drop. See `docs/design.md`, *Not built yet*.
+- Not built: the checks, zip drop. Altium nets come from the Protel2 netlist (`assets/protel.js`). See `docs/design.md`, *Not built yet*.
 
 ## Rules
 

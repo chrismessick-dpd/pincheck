@@ -35,11 +35,17 @@ against what each part allows, offline, from a library of part files. Started 20
   part's pins (number, name, type), and nets whose nodes name the pin and its type. Complete.
 - **Altium SchDoc**: a compound file; `assets/cfb.js` reads it and `assets/schdoc.js` reads the
   components, pins, designators, and parameters. Multi-part components appear on each sheet with all
-  their pins and are merged by designator. **Nets aren't read yet.** Deriving connectivity from a
-  SchDoc means wires, junctions, net labels, power ports, ports, sheet entries, and the project's net
-  scope (set in the `.PrjPcb`), plus channels for repeated sheets. The research (`docs/research/part-data-sources.md`, §4)
-  recommends an Altium-exported netlist instead; which export carries pin names and types is the open
-  question. Next step: try Altium's exports on a real project (Chris), and pick one, or derive the nets.
+  their pins and are merged by designator. Nets aren't derived from the sheets (that would mean wires,
+  junctions, labels, ports, sheet entries, the project's net scope, and channels).
+- **Altium Protel2 netlist** (Design › Netlist For Project › Protel2; chosen 2026-11-12 after trying
+  Altium's exports on a real project): `assets/protel.js`. One block per part (designator, footprint,
+  part type, description, then every parameter) and one per net, each pin as
+  `<designator>-<pin> <part type>-<pin name> <electrical type>`. Designators are the board's, with
+  repeated channels expanded (`C1.2` is channel 2 of C1), and nets are merged across sheets. Altium writes
+  it in Windows-1252. It lists only pins on a net, so with the sheets dropped too, `design.build` takes the
+  netlist's parts and fills in each one's pins on no net (`unconnected: true`) and parameters from its
+  sheet part (`C1.2` → `C1`, or `C1_2` → `C1`). The older Protel format has no pin names and is refused
+  with a pointer to Protel2. The EDIF export carries the same, but heavier.
 - Altium vault parts put the part number in Comment, not a parameter (seen in two real projects); the
   library reference can be a hash. `design.identify` handles both.
 
@@ -95,7 +101,7 @@ unverified. Planted errors for the demo come with the checks.
 
 ## Not built yet
 
-- Nets from SchDoc files (above).
+- Nets derived from SchDoc files without a netlist (not planned while Protel2 works).
 - The checks.
 - A zip or folder drop (the project zip Chris sent; JSZip, as Partcheck loads it).
 - Microchip and IBIS importers; passive part-number decoding.

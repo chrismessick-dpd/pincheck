@@ -9,8 +9,8 @@ Smart Thermostat's Main PCBA with a small library.
 
 ## Use
 
-1. Drop the schematic: every `.SchDoc` of an Altium project (and its `.PrjPcb`, for the name), or a
-   KiCad XML netlist (`kicad-cli sch export netlist --format kicadxml`). It's read in the tab and never
+1. Drop the schematic: every `.SchDoc` of an Altium project with its Protel2 netlist (Design › Netlist
+   For Project › Protel2) for the nets, and its `.PrjPcb` for the name; or a KiCad XML netlist (`kicad-cli sch export netlist --format kicadxml`). It's read in the tab and never
    uploaded.
 2. Pincheck lists the ICs and crystals and says which are in the part library.
 3. **Configure** a part that isn't: its pins come from the schematic symbol, with guessed roles and
