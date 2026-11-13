@@ -99,10 +99,43 @@ In order, each needing only the netlist and part files:
 Every finding names the part file's value and page, and warns instead of failing when that value is
 unverified. Planted errors for the demo come with the checks.
 
+## The schematic viewer (2026-11-13)
+
+Chris asked for a viewer like Fabcheck's Board that jumps to the findings on the schematic.
+
+- **Reading.** `PK.schdoc.graphics` reads what each sheet draws, in Altium's units (10 mil, `_FRAC` in
+  1/100000, Y up, a key left out means 0). That covers the sheet size (`SHEETSTYLE`, or the custom size, grown
+  to what's drawn), component graphics, pins, designators, visible parameters, wires, buses, junctions, net
+  labels, power ports, ports, sheet symbols and entries, text frames, notes, and No ERC marks. Only the placed
+  unit (`OWNERPARTID` is the component's `CURRENTPARTID`, or -1) and its display mode are drawn.
+  `PINCONGLOMERATE`'s low two bits turn a pin, 0x04 hides it, 0x08 shows its name, and 0x10 its number. The
+  connection end is `LOCATION + PINLENGTH`. On a real project, 95% of visible pins land on a wire, label,
+  port, or other pin, and the rest are open in the drawing. Title block texts (`=Title`) come from the
+  document's parameters. Images and harnesses aren't drawn.
+- **Connections.** `PK.schdoc.connect` groups wires per sheet: shared ends, an end on another wire (a T),
+  and junctions join; crossings don't. Pins, labels, ports, and power ports join the wire they sit on. A
+  group's net is the netlist's net of a pin on it (channel sheets list one net per channel), or else its
+  labels. Hovering a pin or wire names it.
+- **Findings.** A finding's `refs`, `pins`, and `nets` map to each sheet (channel copies through
+  `schRef`). The sheet with most of its pins opens, framed on its pins (or its parts, or its nets), with
+  its nets glowing and its parts boxed. Every finding with a place on the sheet has a mark: errors are a
+  striped circle with ✕, warnings a dotted triangle, and notes a circle with i. The rail lists the sheet's
+  findings with Prev and Next (N and P keys), and links to the other sheets it's on. F fits the sheet.
+- **Checked on a real project** (2026-11-13, local only): an Altium project of 18 sheets with its Protel2
+  netlist, 1,031 parts of which 810 are channel copies. All 1,194 drawn pins on a net sit on wired groups, no
+  group mixes two nets, and a finding made for each of the 3,067 netlist pins (2,409 on channel copies) opens
+  on a drawn pin carrying that net.
+- **Drawing.** A canvas with one `Path2D` per style, text culled below 3.5 px. A 586-pin sheet paints in
+  under 7 ms. Colors come from the suite's tokens, not the file's.
+- **KiCad XML** carries no drawing, and the tab says so. A Protel2 netlist alone asks for the sheets.
+- **The demo** is the thermostat's Main PCBA as three Altium sheets and their Protel2 netlist
+  (`tools/make_demo_altium.py` lays them out, `tools/schdoc_write.py` writes the compound files, readable by
+  Pincheck but untested in Altium), from the same parts and nets as the KiCad netlist. Both demos give the same
+  findings (a test).
+
 ## Not built yet
 
 - Nets derived from SchDoc files without a netlist (not planned while Protel2 works).
-- The schematic viewer (a separate session Chris started paused, 2026-11-13).
 - A zip or folder drop (the project zip Chris sent; JSZip, as Partcheck loads it).
 - Microchip and IBIS importers; passive part-number decoding.
 - Sharing findings with Signoff EE, the way Fabcheck sends a run.

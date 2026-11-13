@@ -1,5 +1,6 @@
 // One design from dropped files: SchDoc sheets (merged by designator) or a KiCad XML netlist.
-// PK.design.build(files) → { name, source, sheets, parts, nets, notes }.
+// PK.design.build(files) → { name, source, sheets, parts, nets, notes, drawings, sheetsDrawn }; drawings are the
+// SchDoc sheets' graphics (PK.schdoc.graphics), for the schematic viewer.
 // Each part: { ref, mpn, mpnFrom, libRef, description, footprint, params, pins, sheets, kind, designItemId }.
 (function (PK) {
   'use strict';
@@ -56,7 +57,7 @@
   };
 
   async function build(files) {
-    const sheets = [], notes = [];
+    const sheets = [], notes = [], drawings = [];
     const schematic = new Map(); // parts from SchDoc sheets, by their schematic designator
     const fromNetlist = new Map(); // parts from a netlist, by their board designator
     let nets = null, netlist = '', kicad = false;
@@ -65,6 +66,7 @@
       if (/\.schdoc$/i.test(name)) {
         const r = PK.schdoc.parse(new Uint8Array(await f.arrayBuffer()), name);
         sheets.push(name);
+        if (r.drawing) drawings.push(r.drawing);
         for (const p of r.parts) {
           if (schematic.has(p.ref)) mergePart(schematic.get(p.ref), p);
           else schematic.set(p.ref, p);
@@ -77,6 +79,7 @@
         else if (PK.protel.sniff(text) === 1) { notes.push(name + ': an older Protel netlist, which has no pin names. In Altium, export Design › Netlist For Project › Protel2.'); continue; }
         else { notes.push(name + ': not a KiCad XML or Protel2 netlist, skipped'); continue; }
         sheets.push(name);
+        if (r.drawing) drawings.push(r.drawing);
         for (const p of r.parts) { if (fromNetlist.has(p.ref)) mergePart(fromNetlist.get(p.ref), p); else fromNetlist.set(p.ref, p); }
         nets = (nets || []).concat(r.nets);
       } else if (!/\.(prjpcb|prjpcbstructure|prjpcbvariants|bomdoc|outjob|intlib|pcbdoc|pcbdwf|schdot|harness|edf|edif)$/i.test(name)) notes.push(name + ': not a schematic or netlist, skipped');
@@ -116,7 +119,7 @@
     const prj = files.find(f => /\.prjpcb$/i.test(f.name));
     const top = sheets.find(s => /top|main|root/i.test(s));
     const base = prj ? prj.name.replace(/\.[^.]+$/, '') : files.length === 1 ? files[0].name.replace(/\.[^.]+$/, '') : top ? top.replace(/\.[^.]+$/, '') + ' (' + sheets.length + ' files)' : (sheets.length ? sheets.length + ' files' : 'Design');
-    return { name: base, source, netlist, sheets, parts, nets, notes };
+    return { name: base, source, netlist, sheets, parts, nets, notes, drawings, sheetsDrawn: drawings.length > 0 };
   }
 
   // Parts that share a part number, grouped: [{ mpn, refs, part, kind }], the ICs first.

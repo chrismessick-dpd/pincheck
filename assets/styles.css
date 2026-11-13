@@ -145,3 +145,40 @@ body.pk-dragging .pk-dropzone { display: grid; }
 .pk-wnote { font-size: 12.5px; padding: 6px 10px; border-left: 3px solid var(--hair-2); background: var(--bg-elev); }
 .pk-waived > summary { cursor: pointer; list-style: revert; }
 .pk-waived .pk-frow { opacity: 0.8; }
+
+/* ── Schematic view (assets/viewer.js): sheet tabs over a canvas, a findings rail on the right ── */
+.sv { display: flex; flex-direction: column; min-height: 320px; }
+.sv-tabs { display: flex; gap: 4px; padding: 8px 12px 0; overflow-x: auto; flex: none; border-bottom: 1px solid var(--hair); }
+.sv-tab { border: 1px solid transparent; border-bottom: none; background: none; color: var(--text-2); font: inherit; font-size: 13px; padding: 6px 12px; border-radius: var(--radius-sm) var(--radius-sm) 0 0; cursor: pointer; white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
+.sv-tab:hover { color: var(--text); background: var(--bg-sunk); }
+.sv-tab.on { color: var(--text); background: var(--bg-elev); border-color: var(--hair); margin-bottom: -1px; font-weight: 600; }
+.sv-count { font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 980px; }
+.sv-count-error { color: var(--issue); background: var(--issue-hatch), var(--issue-soft); }
+.sv-count-warn { color: var(--text); background: var(--warn-hatch), var(--warn-soft); box-shadow: inset 0 0 0 1px var(--warn); }
+.sv-body { flex: 1; display: flex; min-height: 0; }
+.sv-stage { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+.sv-canvas { display: block; touch-action: none; cursor: grab; outline: none; }
+.sv-canvas.grabbing { cursor: grabbing; }
+.sv-tools { position: absolute; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 4px; background: var(--bg-elev); border: 1px solid var(--hair); border-radius: var(--radius-sm); padding: 3px; box-shadow: var(--shadow-sm); }
+.sv-tools .icon-btn { font-size: 16px; font-weight: 600; }
+.sv-tip { position: absolute; pointer-events: none; max-width: 340px; background: var(--bg-elev); color: var(--text); border: 1px solid var(--hair); border-radius: var(--radius-sm); box-shadow: var(--shadow); padding: 6px 9px; font-size: 12.5px; line-height: 1.45; z-index: 2; }
+.sv-tip-net { font-family: var(--mono); font-size: 12px; }
+.sv-rail { width: 330px; flex: none; border-left: 1px solid var(--hair); background: var(--bg-elev); overflow-y: auto; font-size: 13px; }
+.sv.rail-closed .sv-rail { width: 44px; }
+.sv-rail-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--hair); position: sticky; top: 0; background: var(--bg-elev); z-index: 1; }
+.sv-sel { padding: 12px 14px; border-bottom: 1px solid var(--hair); background: var(--bg-sunk); }
+.sv-sel p { color: var(--text-2); margin: 6px 0 10px; }
+.sv-sel-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sv-sel-title { margin-bottom: 6px; }
+.sv-also { margin: 0 0 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sv-also .tag { cursor: pointer; border: none; font: inherit; font-size: 12px; }
+.sv-list { display: flex; flex-direction: column; }
+.sv-item { display: flex; gap: 8px; align-items: flex-start; text-align: left; border: none; border-bottom: 1px solid var(--hair); background: none; color: var(--text); font: inherit; padding: 8px 14px; cursor: pointer; }
+.sv-item:hover { background: var(--bg-sunk); }
+.sv-item.on { background: var(--accent-soft); }
+.sv-hint { padding: 10px 14px; margin: 0; }
+@media (max-width: 860px) {
+  .sv-body { flex-direction: column; }
+  .sv-rail { width: auto; max-height: 40%; border-left: none; border-top: 1px solid var(--hair); }
+  .sv.rail-closed .sv-rail { width: auto; max-height: 44px; }
+}

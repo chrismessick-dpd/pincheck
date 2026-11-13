@@ -22,8 +22,13 @@ the suite's hard rules.
   (23 checks in six groups, net voltages from regulators and dividers) and `assets/findings.js` (Overview,
   Findings). Contract: `docs/checks.md`. Blind run on a real Altium project (local only) found reversed
   gate supply pins, an open VBAT, a missing SMPS capacitor, wrong crystal load capacitors, and two RXD
-  outputs on one net. The schematic viewer is a separate, paused session.
-- Not built: the schematic viewer, zip drop. Altium nets come from the Protel2 netlist (`assets/protel.js`). See `docs/design.md`, *Not built yet*.
+  outputs on one net.
+- **Schematic viewer (2026-11-13, Chris: like Fabcheck's Board, jumping to findings; built, not committed):**
+  `assets/schdoc.js` `graphics` reads each sheet's drawing and `connect` its wires; `assets/viewer.js` draws it
+  on a canvas (sheet tabs, pan and zoom, hover names, a findings rail, marks at each finding's pins). See
+  `docs/design.md`, *The schematic viewer*. The demo is now Altium sheets and a Protel2 netlist made by
+  `tools/make_demo_altium.py` (with `tools/schdoc_write.py`), beside the KiCad netlist.
+- Not built: zip drop. Altium nets come from the Protel2 netlist (`assets/protel.js`). See `docs/design.md`, *Not built yet*.
 
 ## Rules
 
@@ -49,6 +54,7 @@ the suite's hard rules.
 1. `python tools/make_demo.py` if the demo changed.
 2. `python tools/stamp_version.py`.
 3. Serve the tools folder (preview `signoff-suite-alt`, port 8774) and open `pincheck/tests/test.html`:
-   PASS. Then `pincheck/index.html?demo`: 2 of 4 ICs in the library.
+   PASS (29 tests). Then `pincheck/index.html?demo`: 2 of 4 ICs in the library, and the Schematic tab draws
+   three sheets.
 4. In the browser pane, scripts are cached: fetch changed files with `{cache: 'reload'}` first. The demo
    library is loaded into IndexedDB `pincheck-demo` once; delete that database to reload it.

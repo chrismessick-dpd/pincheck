@@ -163,13 +163,14 @@
   // ── Rendering ──
   function renderAll() { renderSide(); renderToolbar(); renderTabs(); renderView(); }
 
-  // Overview, Findings, and Parts, as Fabcheck's toolbar tabs (the schematic view joins them later).
+  // Overview, Findings, Schematic, and Parts, as Fabcheck's toolbar tabs. The Schematic tab shows for every
+  // design; a KiCad netlist's says it has no drawing (assets/viewer.js).
   function renderTabs() {
     const seg = $('#view-seg'), d = active();
     if (state.view !== 'design' || !d || state.busy) { seg.hidden = true; return; }
     const run = ensureRun(d), c = PK.pages.counts(run.findings.filter(f => !f.waived));
     const tabs = [['overview', 'Overview', ''], ['findings', 'Findings', c.error || c.warn ? '<span class="count">' + (c.error ? '✕ ' + c.error + ' ' : '') + (c.warn ? '▲ ' + c.warn : '') + '</span>' : ''], ['parts', 'Parts', '']];
-    if (PK.viewer && d.sheetsDrawn) tabs.splice(2, 0, ['schematic', 'Schematic', '']);
+    if (PK.viewer) tabs.splice(2, 0, ['schematic', 'Schematic', '']);
     seg.hidden = false;
     seg.innerHTML = tabs.map(([k, l, x]) => '<button role="tab" data-tab="' + k + '" class="' + (state.tab === k ? 'on' : '') + '">' + l + x + '</button>').join('');
   }
@@ -209,7 +210,7 @@
       const ctx = { lib: state.lib, state, hasSheets: !!d.sheetsDrawn };
       if (state.tab === 'findings') v.innerHTML = PK.pages.findings(d, ensureRun(d), ctx);
       else if (state.tab === 'parts') v.innerHTML = designPage(d);
-      else if (state.tab === 'schematic' && PK.viewer) PK.viewer.render(v, d, state);
+      else if (state.tab === 'schematic' && PK.viewer) { ensureRun(d); PK.viewer.render(v, d, state); }
       else v.innerHTML = PK.pages.overview(d, ensureRun(d), ctx);
       return;
     }
@@ -336,7 +337,7 @@
   window.addEventListener('dragover', e => e.preventDefault());
   window.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; document.body.classList.remove('pk-dragging'); if (e.dataTransfer.files.length && !document.querySelector('.sheet-wrap')) openFiles(e.dataTransfer.files); });
 
-  // ── The demo: the Smart Thermostat's Main PCBA as a KiCad netlist, and a small library ──
+  // ── The demo: the Smart Thermostat's Main PCBA as Altium sheets and as a KiCad netlist, and a small library ──
   async function loadDemo() {
     try {
       const idx = await (await fetch('demo/library/index.json')).json();
@@ -347,6 +348,11 @@
       await reloadLib();
       const text = await (await fetch('demo/thermostat-main-pcba.xml')).text();
       await openFiles([new File([text], 'thermostat-main-pcba.xml', { type: 'text/xml' })]);
+      if (active()) active().name = 'Main PCBA, KiCad netlist';
+      // The same board as Altium sheets with their Protel2 netlist (tools/make_demo_altium.py), opened last so it shows first.
+      const names = await (await fetch('demo/altium/index.json')).json();
+      const files = await Promise.all(names.map(async n => new File([await (await fetch('demo/altium/' + encodeURIComponent(n))).arrayBuffer()], n)));
+      await openFiles(files);
       if (active()) active().name = 'Main PCBA (DT-1042 rev B)';
       renderAll();
     } catch (e) { toast('Couldn\'t load the demo: ' + e.message, 'error'); }

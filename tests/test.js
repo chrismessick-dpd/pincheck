@@ -206,6 +206,107 @@
     eq(d.kids[0].attrs.x, '1 & 2'); eq(d.kids[0].kids[0].text, '<3'); eq(d.kids[0].text, '<raw>');
   });
 
+  // ── Sheet graphics and the schematic viewer (assets/schdoc.js graphics and connect, assets/viewer.js) ──
+  // Records are made up here; the Altium demo's sheets come from tools/make_demo_altium.py.
+  const G = (recs, name) => PK.schdoc.graphics(recs, {}, name || 't.SchDoc');
+  t('sheet graphics: missing keys are 0, FRAC parts, and the sheet size', () => {
+    const d = G([{ RECORD: '31', SHEETSTYLE: '12' }, { RECORD: '27', LOCATIONCOUNT: '2', X1: '10', X1_FRAC: '50000', Y1: '20', Y2: '20', X2_FRAC: '25000' }]);
+    eq([d.w, d.h], [1700, 1100], 'Tabloid'); eq(d.wires[0], [10.5, 20, 0.25, 20]);
+    eq([G([{ RECORD: '31' }]).w, G([{ RECORD: '31' }]).h], [1150, 760], 'no style is A4');
+    eq([G([{ RECORD: '31', USECUSTOMSHEET: 'T', CUSTOMX: '1500', CUSTOMY: '950' }]).w], [1500], 'custom size');
+    const far = G([{ RECORD: '31' }, { RECORD: '13', 'LOCATION.X': '1200', 'LOCATION.Y': '10', 'CORNER.X': '1300', 'CORNER.Y': '800' }]);
+    eq(far.bounds, [0, 0, 1300, 800], 'bounds grow to what is drawn');
+  });
+  t('sheet graphics: only the placed unit and display mode are drawn', () => {
+    const recs = [{ RECORD: '31' },
+      { RECORD: '1', CURRENTPARTID: '2', PARTCOUNT: '3', LIBREFERENCE: 'DUAL' },
+      { RECORD: '34', OWNERINDEX: '1', TEXT: 'U5', 'LOCATION.X': '100', 'LOCATION.Y': '120' },
+      { RECORD: '14', OWNERINDEX: '1', OWNERPARTID: '1', 'LOCATION.X': '0', 'CORNER.X': '10', 'CORNER.Y': '10' },
+      { RECORD: '14', OWNERINDEX: '1', OWNERPARTID: '2', 'LOCATION.X': '100', 'LOCATION.Y': '100', 'CORNER.X': '140', 'CORNER.Y': '130' },
+      { RECORD: '14', OWNERINDEX: '1', OWNERPARTID: '2', OWNERPARTDISPLAYMODE: '1', 'CORNER.X': '5', 'CORNER.Y': '5' },
+      { RECORD: '6', OWNERINDEX: '1', OWNERPARTID: '-1', LOCATIONCOUNT: '2', X1: '100', Y1: '100', X2: '140', Y2: '100' },
+      { RECORD: '2', OWNERINDEX: '1', OWNERPARTID: '1', DESIGNATOR: '1', 'LOCATION.X': '90', 'LOCATION.Y': '110', PINLENGTH: '20' },
+      { RECORD: '2', OWNERINDEX: '1', OWNERPARTID: '2', DESIGNATOR: '7', NAME: 'OUTB', PINCONGLOMERATE: '27', 'LOCATION.X': '140', 'LOCATION.Y': '110', PINLENGTH: '20' }];
+    const d = G(recs);
+    eq(d.shapes.map(s => s.t), ['rect', 'line'], 'unit 2 in mode 0, plus the shared line');
+    eq(d.pins.map(p => p.num), ['7']);
+    const p = d.pins[0];
+    eq([p.bx, p.by, p.x, p.y, p.orient, p.showName, p.showNum, p.hidden], [140, 110, 140, 90, 3, true, true, false], 'turned down, name and number shown');
+    eq(d.texts.find(x => x.kind === 'designator').s, 'U5B', 'a multi-unit part shows its unit letter');
+    eq(d.comps[0].ref, 'U5'); eq(d.comps[0].bbox, [100, 90, 140, 130]);
+  });
+  t('sheet graphics: title block texts from the document parameters', () => {
+    const d = G([{ RECORD: '31' }, { RECORD: '41', NAME: 'Title', TEXT: 'Power' }, { RECORD: '41', NAME: 'Revision', TEXT: '*' },
+      { RECORD: '4', TEXT: '=Title' }, { RECORD: '4', TEXT: '=Revision' }, { RECORD: '4', TEXT: 'plain' }]);
+    eq(d.texts.map(x => x.s), ['Power', 'plain']);
+  });
+  t('connectivity: shared ends, T joins, junctions, crossings, and points on wires', () => {
+    const d = G([{ RECORD: '31' },
+      { RECORD: '27', LOCATIONCOUNT: '2', X1: '0', Y1: '0', X2: '100', Y2: '0' },
+      { RECORD: '27', LOCATIONCOUNT: '2', X1: '50', Y1: '0', X2: '50', Y2: '50' },
+      { RECORD: '27', LOCATIONCOUNT: '2', X1: '0', Y1: '100', X2: '100', Y2: '100' },
+      { RECORD: '27', LOCATIONCOUNT: '2', X1: '30', Y1: '60', X2: '30', Y2: '140' },
+      { RECORD: '27', LOCATIONCOUNT: '2', X1: '70', Y1: '60', X2: '70', Y2: '140' },
+      { RECORD: '29', 'LOCATION.X': '70', 'LOCATION.Y': '100' },
+      { RECORD: '25', 'LOCATION.X': '80', 'LOCATION.Y': '0', TEXT: 'A' },
+      { RECORD: '17', 'LOCATION.X': '30', 'LOCATION.Y': '140', TEXT: 'GND' }]);
+    const c = PK.schdoc.connect(d);
+    eq(c.wire[1], c.wire[0], 'a T joins'); eq(c.label[0], c.wire[0], 'a label on a wire');
+    ok(c.wire[3] !== c.wire[2], 'a crossing does not join'); eq(c.wire[4], c.wire[2], 'a junction joins');
+    eq(c.power[0], c.wire[3], 'a power port at a wire end');
+  });
+
+  const alt = await (async () => {
+    const names = await (await fetch('../demo/altium/index.json', { cache: 'no-store' })).json();
+    const files = await Promise.all(names.map(async n => new File([await (await fetch('../demo/altium/' + encodeURIComponent(n), { cache: 'no-store' })).arrayBuffer()], n)));
+    return D.build(files);
+  })();
+  t('Altium demo: three drawn sheets joined to the Protel2 netlist', () => {
+    eq(alt.source, 'altium'); eq(alt.sheetsDrawn, true); eq(alt.drawings.map(x => x.name), ['Power.SchDoc', 'MCU.SchDoc', 'IO.SchDoc']);
+    eq(alt.parts.length, design.parts.length); eq(alt.nets.length, design.nets.length);
+    const mcu = alt.drawings[1];
+    eq([mcu.w, mcu.h], [1550, 1110]);
+    ok(mcu.texts.some(x => x.s === 'MCU, status LEDs, and I2C'), 'the title from the sheet parameters');
+    const vdd = mcu.pins.find(p => p.ref === 'U4' && p.num === '4');
+    eq([vdd.name, vdd.orient, vdd.type], ['VDD/VDDA', 1, 'power']);
+  });
+  t('Altium demo: every netlist pin is drawn onto its net, and no group mixes two nets', () => {
+    const m = PK.viewer.model(alt);
+    let pins = 0, placed = 0;
+    // The drawing alone must name each pin's net: a label or power port on the wires its end touches.
+    m.sheets.forEach(s => s.dr.pins.forEach((p, i) => {
+      const net = alt.nets.find(n => n.nodes.some(x => x.ref === p.ref && x.pin === p.num));
+      if (!net) return;
+      pins++;
+      const names = s.namesOf(s.conn.pin[i]);
+      if (names.length === 1 && names[0] === net.name) placed++; else throw new Error(p.ref + '.' + p.num + ' on ' + net.name + ' is drawn on ' + (names.join(', ') || 'nothing'));
+    }));
+    eq(placed, pins); ok(pins > 120, pins + ' pins');
+    m.sheets.forEach(s => { for (let g = 0; g < s.conn.groups; g++) ok(s.netsOf(g).length <= 1, s.dr.name + ' group ' + g + ': ' + s.netsOf(g).join(', ')); });
+    const pw = m.sheets[0];
+    eq(pw.netsOf(pw.conn.label[pw.dr.labels.findIndex(l => l.text === 'FB')]), ['FB'], 'the divider: a T and a junction');
+  });
+  t('Altium demo: the same findings as the KiCad netlist', () => {
+    const k = PK.checks.run(design, lib).findings.map(f => f.id).sort(), a = PK.checks.run(alt, lib).findings.map(f => f.id).sort();
+    eq(a, k);
+  });
+  t('viewer: a finding opens the sheet with its pins, and channel copies map to their sheet part', () => {
+    const run = PK.checks.run(alt, lib);
+    const f = run.findings.find(x => x.check === 'func.uart');
+    const hits = PK.viewer.hitsOf(alt, f);
+    eq(hits[0].si, 1, 'the MCU sheet first'); ok(hits.some(h => h.si === 2), 'and the Wi-Fi sheet');
+    ok(hits[0].pins.length >= 1, 'with its pins');
+    // A channel copy, U4.2, is drawn as U4.
+    const copy = Object.assign({}, alt, { parts: alt.parts.concat([Object.assign({}, alt.parts.find(p => p.ref === 'U4'), { ref: 'U4.2', schRef: 'U4' })]), _sch: null });
+    const h2 = PK.viewer.hitsOf(copy, { id: 'x', refs: ['U4.2'], pins: ['U4.2.6'], nets: [] });
+    eq([h2[0].si, h2[0].comps, copy._sch.sheets[1].dr.pins[h2[0].pins[0]].num], [1, ['U4'], '6']);
+  });
+  t('viewer: a KiCad netlist has nothing to draw, and says so', () => {
+    const el = document.createElement('div');
+    PK.viewer.render(el, design, {});
+    ok(/No drawing in a KiCad netlist/.test(el.textContent));
+  });
+
   for (const [name, fn] of tests) {
     try { await fn(); out.push('✓ ' + name); } catch (e) { fails.push(name); out.push('✕ ' + name + '\n    ' + e.message); }
   }

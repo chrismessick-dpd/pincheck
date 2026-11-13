@@ -3,18 +3,21 @@ Signoff EE's demos use) as a KiCad XML netlist, and a small part library.
 
     python tools/make_demo.py
 
-Writes demo/thermostat-main-pcba.xml and demo/library/*.json (with index.json). Pin numbers and names
+Writes demo/thermostat-main-pcba.xml, demo/library/*.json (with index.json), and the same board drawn
+as Altium sheets with its Protel2 netlist in demo/altium/ (tools/make_demo_altium.py). Pin numbers and names
 follow the real parts' datasheets; the circuit is made up. Library values are datasheet facts, left
 unverified except where the demo story says someone checked them.
 
 Planted for the checks (tests/test.js expects them): UART TX to TX (func.uart) and DISP_INT and TOUCH_INT
 on EXTI line 4 (func.exti).
 """
-import json, pathlib
+import json, pathlib, sys
 from xml.sax.saxutils import quoteattr, escape
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "demo"
+sys.path.insert(0, str(ROOT / 'tools'))
+import make_demo_altium  # noqa: E402
 
 # ref: (lib part, value, MPN, manufacturer, description, footprint, {pin: (name, kicad type)})
 P = lambda *names: {str(i + 1): (n, 'passive') for i, n in enumerate(names)}
@@ -218,7 +221,9 @@ def main():
         (OUT / 'library' / name).write_text(json.dumps(f, indent=2, ensure_ascii=False) + '\n', encoding='utf-8', newline='\n')
         names.append(name)
     (OUT / 'library' / 'index.json').write_text(json.dumps(names, indent=2) + '\n', encoding='utf-8', newline='\n')
-    print('wrote', OUT / 'thermostat-main-pcba.xml', 'and', len(names), 'library files')
+    sheets = make_demo_altium.make(PARTS, NETS, OUT / 'altium', pin_num)
+    (OUT / 'altium' / 'index.json').write_text(json.dumps(sheets + ['Main PCBA.NET'], indent=2) + '\n', encoding='utf-8', newline='\n')
+    print('wrote', OUT / 'thermostat-main-pcba.xml', 'and', len(names), 'library files, and', len(sheets), 'Altium sheets with their netlist')
 
 
 if __name__ == '__main__':
