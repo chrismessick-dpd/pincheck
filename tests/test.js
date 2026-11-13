@@ -301,6 +301,12 @@
     const h2 = PK.viewer.hitsOf(copy, { id: 'x', refs: ['U4.2'], pins: ['U4.2.6'], nets: [] });
     eq([h2[0].si, h2[0].comps, copy._sch.sheets[1].dr.pins[h2[0].pins[0]].num], [1, ['U4'], '6']);
   });
+  t('viewer: a finding about a part shows only where the part is drawn, not wherever its net is', () => {
+    const onPart = PK.viewer.hitsOf(alt, { id: 'hx1', refs: ['U4'], pins: ['U4.4'], nets: ['3V3'] });
+    eq(onPart.map(h => h.si), [1], 'U4 is on the MCU sheet only');
+    const onNet = PK.viewer.hitsOf(alt, { id: 'hx2', refs: [], pins: [], nets: ['3V3'] });
+    ok(onNet.length > 1, 'a net finding goes wherever the net is: ' + onNet.map(h => h.si));
+  });
   t('viewer: a KiCad netlist has nothing to draw, and says so', () => {
     const el = document.createElement('div');
     PK.viewer.render(el, design, {});

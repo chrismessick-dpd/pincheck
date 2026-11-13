@@ -82,6 +82,10 @@
       h.score = h.pins.length * 4 + h.comps.length * 2 + (h.groups.size ? 1 : 0);
       if (h.score) out.push(h);
     });
+    // A finding about a part goes only where that part is drawn: its net alone (a ground on every sheet, say)
+    // doesn't place it on another sheet. Findings about a net, or about parts no sheet draws, go by the net.
+    const placed = out.some(h => h.pins.length || h.comps.length);
+    if (placed) for (let i = out.length - 1; i >= 0; i--) if (!out[i].pins.length && !out[i].comps.length) out.splice(i, 1);
     out.sort((a, b) => b.score - a.score || a.si - b.si);
     m.hits.set(f.id, out);
     return out;
@@ -411,16 +415,21 @@
       ctx.fillStyle = c.bg; ctx.fillRect(0, 0, this.cw, this.ch);
       const k = v.scale, px = 1 / k;
       const sheetT = () => ctx.setTransform(dpr * k, 0, 0, -dpr * k, dpr * v.ox, dpr * v.oy);
-      sheetT();
       const dr = s.dr, p = s.paths;
+      const selF = this.sel && this.live().find(f => f.id === this.sel);
+      const selH = selF && hitsOf(this.m, selF).find(h => h.si === this.si);
+      const selColor = selF && (selF.severity === 'error' ? c.issue : selF.severity === 'warn' ? c.warn : c.accent);
+      // A selected finding's parts: each unit, or with pins named, only the units holding them.
+      const pinUnits = selH ? new Set(selH.pins.map(i => dr.pins[i].cid)) : null;
+      const selUnits = selH ? selH.comps.flatMap(r => (s.comps.get(r) || []).filter(cp => !selH.pins.length || pinUnits.has(cp.cid))) : [];
+      const scene = () => {
+      sheetT();
       // The paper.
       ctx.fillStyle = c.paper; ctx.fillRect(0, 0, dr.w, dr.h);
       ctx.lineWidth = px; ctx.strokeStyle = c.edge; ctx.strokeRect(0, 0, dr.w, dr.h);
       const lw = units => Math.max(px, units);
       ctx.lineCap = 'round'; ctx.lineJoin = 'round';
       // The finding's nets and the hovered net, under everything.
-      const selF = this.sel && this.live().find(f => f.id === this.sel);
-      const selH = selF && hitsOf(this.m, selF).find(h => h.si === this.si);
       const glow = (groups, color, width, alpha) => {
         if (!groups || !groups.size) return;
         ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = color; ctx.lineWidth = Math.max(width * px, 3);
@@ -429,7 +438,7 @@
         dr.pins.forEach((pin, i) => { if (groups.has(s.conn.pin[i])) { path.moveTo(pin.bx, pin.by); path.lineTo(pin.x, pin.y); } });
         ctx.stroke(path); ctx.restore();
       };
-      if (selH) glow(selH.groups, selF.severity === 'error' ? c.issue : selF.severity === 'warn' ? c.warn : c.accent, 7, 0.35);
+      if (selH) glow(selH.groups, selColor, 7, 0.35);
       if (this.hover && this.hover.g >= 0) glow(new Set([this.hover.g]), c.accent, 6, 0.25);
 
       ctx.fillStyle = c.dark ? 'rgba(255,255,255,0.04)' : c.accentSoft; ctx.fill(p.bodyFill);
@@ -443,18 +452,6 @@
       ctx.fillStyle = c.accent; ctx.fill(p.junctions);
       ctx.strokeStyle = c.accentInk; ctx.lineWidth = lw(1); ctx.stroke(p.power); ctx.fillStyle = c.accentInk; ctx.fill(p.powerFill); ctx.stroke(p.ports);
       ctx.strokeStyle = c.text3; ctx.stroke(p.noerc);
-
-      // The selected finding's parts: a dashed box around each.
-      if (selH) {
-        ctx.save(); ctx.setLineDash([4 * px, 3 * px]); ctx.lineWidth = 1.5 * px; ctx.strokeStyle = selF.severity === 'error' ? c.issue : selF.severity === 'warn' ? c.warn : c.accent;
-        // Each unit of its parts, or with pins named, only the units holding them.
-        const pinUnits = new Set(selH.pins.map(i => dr.pins[i].cid));
-        for (const r of selH.comps) for (const cp of s.comps.get(r) || []) {
-          if (selH.pins.length && !pinUnits.has(cp.cid)) continue;
-          const [x0, y0, x1, y1] = cp.bbox; ctx.strokeRect(x0 - 4, y0 - 4, x1 - x0 + 8, y1 - y0 + 8);
-        }
-        ctx.restore();
-      }
 
       // Text, in screen space so it stays upright and crisp; skipped when too small or off screen.
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -473,6 +470,34 @@
         ctx.fillStyle = col[t.cls] || c.text2;
         drawText(ctx, t, sx, sy, size);
       }
+      };
+      scene();
+
+      // A selected finding: everything but its parts and nets is veiled, then those are drawn again on top
+      // (clipped to boxes around its parts, its nets' wires, pins, and labels), with a dashed box per part.
+      if (selH) {
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = c.bg; ctx.globalAlpha = c.dark ? 0.72 : 0.66; ctx.fillRect(0, 0, this.cw, this.ch); ctx.globalAlpha = 1;
+        const focus = new Path2D(), box = (x0, y0, x1, y1, pad) => focus.rect(Math.min(x0, x1) - pad, Math.min(y0, y1) - pad, Math.abs(x1 - x0) + pad * 2, Math.abs(y1 - y0) + pad * 2);
+        for (const cp of selUnits) box(...cp.bbox, 8);
+        dr.wires.forEach((w, i) => { if (selH.groups.has(s.conn.wire[i])) for (let j = 0; j + 3 < w.length; j += 2) box(w[j], w[j + 1], w[j + 2], w[j + 3], 8); });
+        dr.pins.forEach((pin, i) => { if (selH.groups.has(s.conn.pin[i])) box(pin.bx, pin.by, pin.x, pin.y, 8); });
+        // Labels and power ports on those nets: a strip along their text, as long as it could reach either way.
+        const near = (list, idx, size) => list.forEach((l, i) => {
+          if (!selH.groups.has(idx[i])) return;
+          const em = size(l) * TEXT_EM, w = ((l.text || l.name || '').length * 0.62 + 1) * em + 6, h = em + 6;
+          if (l.orient === 1 || l.orient === 3) box(l.x - h, l.y - w, l.x + h, l.y + w, 0); else box(l.x - w, l.y - h, l.x + w, l.y + h, 0);
+        });
+        near(dr.labels, s.conn.label, l => (l.font && l.font.size) || 10);
+        near(dr.powers, s.conn.power, () => 10);
+        near(dr.ports, s.conn.port, () => 10);
+        ctx.save(); sheetT(); ctx.clip(focus); scene(); ctx.restore();
+        sheetT();
+        ctx.save(); ctx.setLineDash([4 * px, 3 * px]); ctx.lineWidth = 1.5 * px; ctx.strokeStyle = selColor;
+        for (const cp of selUnits) { const [x0, y0, x1, y1] = cp.bbox; ctx.strokeRect(x0 - 4, y0 - 4, x1 - x0 + 8, y1 - y0 + 8); }
+        ctx.restore();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
 
       // Finding marks: every finding with a place here, the selected one larger and ringed.
       const list = this.sheetFindings(this.si);
@@ -482,7 +507,9 @@
         for (const [x, y] of this.marksOf(f, h)) {
           const sx = v.ox + x * k, sy = v.oy - y * k;
           if (sx < -20 || sx > this.cw + 20 || sy < -20 || sy > this.ch + 20) continue;
+          if (selH && !on) ctx.globalAlpha = 0.4;
           mark(ctx, sx, sy, f.severity, on ? 11 : 7.5, c, this.pat, on);
+          ctx.globalAlpha = 1;
           this.markHits.push({ x: sx, y: sy, r: on ? 12 : 9, id: f.id });
         }
       }

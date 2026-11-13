@@ -127,6 +127,10 @@ Chris asked for a viewer like Fabcheck's Board that jumps to the findings on the
   its nets glowing and its parts boxed. Every finding with a place on the sheet has a mark: errors are a
   striped circle with ✕, warnings a dotted triangle, and notes a circle with i. The rail lists the sheet's
   findings with Prev and Next (N and P keys), and links to the other sheets it's on. F fits the sheet.
+  A finding about a part goes only on the sheets that draw its pins or parts; its nets place it only when
+  no sheet draws them (2026-11-13, Chris: a part's supply finding showed on a sheet without that part, by
+  its ground net). While a finding is selected, the rest of the sheet is veiled. Its parts, its nets' wires,
+  pins, and labels stay bright, and the other findings' marks fade (Chris).
 - **Checked on a real project** (2026-11-13, local only): an Altium project of 18 sheets with its Protel2
   netlist, 1,031 parts of which 810 are channel copies. All 1,194 drawn pins on a net sit on wired groups, no
   group mixes two nets, and a finding made for each of the 3,067 netlist pins (2,409 on channel copies) opens
