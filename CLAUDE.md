@@ -22,7 +22,7 @@ the suite's hard rules.
   Then (2026-11-13, Chris) a main board's batch of 10 (7 Hirose BM23FR, BM23PF, and DF65 connectors, PI3USB9201,
   MAX98388, and TPS631013) was filled and committed straight to `pincheck_data` (`36bead4`, additive, read back), each
   with `status: "imported"`.
-- **Status and the made line (2026-11-13, Chris; not committed):** a file's `status` is `imported` (an LLM or a
+- **Status and the made line (2026-11-13, Chris; pushed with `d045099`):** a file's `status` is `imported` (an LLM or a
   library brought it in) or `checked` (a person went through it), set in the Identity tab (`L.STATUSES`, `L.status`;
   missing counts as imported). The Identity tab's foot reads "Made by llm (pincheck-part skill), …" (`L.madeLine`).
 - **Checks (2026-11-13, Chris: all of them, Fabcheck-style pages, no check matrix):** `assets/checks.js`
