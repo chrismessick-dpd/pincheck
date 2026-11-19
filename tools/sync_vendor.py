@@ -16,6 +16,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT.parent / "ee_design_review"
 FILES = [
     ("assets/model.js", "assets/vendor/model.js"),
+    ("assets/localstore.js", "assets/vendor/localstore.js"),
     ("assets/github.js", "assets/vendor/github.js"),
 ]
 

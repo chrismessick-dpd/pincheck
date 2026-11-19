@@ -364,7 +364,9 @@
     try {
       const plan = sendPlan(d);
       sendSkip(d, plan);
+      await S().ready;
       const r = S().send(d.soSlug, plan, { label: d.name, run: made.run }, d.soSkip);
+      await r.saved;   // kept in Signoff EE's local store before anything else happens
       await R().keep(Object.assign({ projectId: r.projectId }, made)).catch(() => {});
       d.sentTo = { projectId: r.projectId, name: r.name, runId: made.run.id };
       d.soResult = `Sent to "${r.name}": ${r.created} new, ${r.updated} updated${r.skipped ? `, ${r.skipped} left out` : ''}${r.resolvedNotes ? `, ${r.resolvedNotes} earlier issue(s) noted as no longer found` : ''}${r.dropped ? `, ${r.dropped} reference row(s) removed` : ''}. ${DEMO ? 'Open Signoff EE to see them.' : 'Sync in Signoff EE to push them.'}`;
