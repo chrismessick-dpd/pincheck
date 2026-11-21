@@ -23,10 +23,10 @@
     return out;
   }
 
-  const S = { raw: null, part: null, text: '', map: {}, result: null, real: false, view: null };
-  function setPart(raw, real) { S.raw = raw; S.part = P.part(raw); S.real = real; S.map = {}; replan(true); }
+  const S = { raw: null, part: null, text: '', map: {}, types: {}, result: null, real: false, view: null };
+  function setPart(raw, real) { S.raw = raw; S.part = P.part(raw); S.real = real; S.map = {}; S.types = {}; replan(true); }
   function replan(fresh) {
-    S.result = P.plan(S.part, parseConnects(S.text), S.map);
+    S.result = P.plan(S.part, parseConnects(S.text), S.map, S.types);
     $('#pm-part').innerHTML = `<div class="pm-part-name">${esc(S.part.meta.mpn)}</div><div class="pm-part-sub">${esc(S.part.meta.manufacturer || '')} · ${esc(S.part.meta.package || '')} · ${S.part.pads.length} pins${S.real ? ' · <b>opened from disk</b>' : ''}</div>`;
     if (S.view && !fresh) { S.view.update({ part: S.part, result: S.result, map: S.map }); return; }
     if (S.view) S.view.destroy();
@@ -35,6 +35,11 @@
       onView: (v) => store.set('view', v),
       onPick: (pad, fn, req, gpio) => { S.map = P.pick(S.map, S.result, S.part, pad, fn, req, gpio); replan(); },
       onUnpick: (pad) => { S.map = P.unpick(S.map, pad); replan(); },
+      onClear: (reqId) => { S.map = Object.fromEntries(Object.entries(S.map).filter(([, l]) => l.req !== reqId)); replan(); },
+      onType: (reqId, keys, val) => {
+        keys.forEach((k) => { if (val) S.types[k] = val; else delete S.types[k]; });
+        S.map = Object.fromEntries(Object.entries(S.map).filter(([, l]) => l.req !== reqId)); replan();
+      },
       onFix: (reqId) => {
         const r = S.result.reqs.find((q) => q.id === reqId), lines = S.text.split(/\r?\n/), ln = r.users[0].conn.line;
         lines[ln] = lines[ln].replace(r.fix.from, r.fix.to);
@@ -55,7 +60,7 @@
   }
 
   $('#pm-apply').addEventListener('click', () => { S.text = $('#pm-text').value; replan(); });
-  $('#pm-clear').addEventListener('click', () => { S.map = {}; replan(); });
+  $('#pm-clear').addEventListener('click', () => { S.map = {}; S.types = {}; replan(); });
   $('#pm-demo').addEventListener('click', () => { S.text = window.PM_DEMO.connects; $('#pm-text').value = S.text; setPart(window.PM_DEMO.part, false); });
   $('#pm-part-file').addEventListener('change', (e) => readFile(e.target.files[0], 'part'));
   $('#pm-conn-file').addEventListener('change', (e) => readFile(e.target.files[0], 'conns'));

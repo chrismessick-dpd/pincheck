@@ -184,3 +184,5 @@ other.
 3. The part file is copied into the review when a pin map starts (Chris).
 4. Labels stay as written; the pin map holds the choice (Chris).
 5. `.ioc` export and import after the planner works (Chris).
+6. A connection's type can be set in the pin map over its label (Chris, 2026-11-21: "Sense1_I2C" as I2C), from a list of
+   the part's own peripherals; stored as `pins.types` on the MCU block, the label untouched.
