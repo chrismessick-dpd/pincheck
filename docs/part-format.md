@@ -41,6 +41,7 @@ private repo `pincheck_data` as `parts/<id>.json`, and in each browser's Indexed
 | `kind` | One of `node tools/part.js kinds`. It picks which parameters the editor offers. |
 | `datasheet` | Which document the values came from: title, document number and revision, link, and the PDF's SHA-256. |
 | `status` | `imported` (brought in by an LLM or a library, not yet gone through by hand) or `checked` (a person went through it against the datasheet). Set in the Identity tab; a file without it counts as `imported`. Per-value `ok` still says which values were verified. |
+| `peripherals` | For an MCU, the peripheral instances the part has (`["ADC1", "I2C1", "I2C2", "SPI1", …]`), whether or not they have pins, so a missing one (a `DAC2`, a touch controller) is a fact, not an absence. `import_cubemx.py` writes it (2026-11-20); the pin planner (`docs/pin-planner.md`) reads it. |
 | `made`, `updated` | Who started the file and how (`from schematic`, `by hand`, `import:cubemx`, `llm (pincheck-part)`), and when it last changed. |
 
 ## Pins
@@ -54,13 +55,14 @@ differences).
 | `role` | What the pin is for: `power-in`, `power-out`, `ground`, `io`, `input`, `output`, `open-drain`, `analog`, `bus` (a CAN, RS-485, RS-232, or USB data line: the domain's logic levels don't apply; its limits are `bus.absmax`, `can.vcm`, or the pin's own `vmax` and `absmax`), `clock-in`, `clock-out`, `reset`, `boot`, `enable`, `feedback`, `switch`, `bootstrap`, `power-good`, `nc` (may be tied), `dnc` (do not connect), `pad`, `other`. |
 | `domain` | For a power pin, the supply group it belongs to; for an I/O pin, the supply that powers it. Must be in `domains`. |
 | `ft` | `true` if the datasheet marks the pin 5 V tolerant. |
-| `functions` | Alternate functions and interface roles: `"I2C1_SCL AF6"`, `"EXTI8"`, `"ADC1_IN5"`. |
+| `functions` | Alternate functions and interface roles: `"I2C1_SCL AF6"`, `"EXTI8"`, `"ADC1_IN5"`. `INSTANCE_SIGNAL`, then ` AFn` when the AF mux selects it; a signal without an AF number (ADC inputs, USB DM/DP, comparator inputs) is an analog or additional function, enabled by its peripheral. |
 | `reset` | State during and after reset: `hiz`, `analog`, `low`, `high`, `pull-up`, `pull-down`. |
 | `unused` | What the datasheet says to do when unused: `float`, `gnd`, `supply`, `pull`, `must`. |
 | `ext` | An external part the datasheet requires on the pin: `"4.7 µF to GND, ESR < 1 Ω"`. |
 | `vmax`, `absmax` | The pin's own recommended maximum and absolute maximum voltage, where they differ from its domain's `io.absmax` (I2C pins rated 1.98 V on a 3.3 V part, a pin rated BATT+0.3). Numbers in volts or expressions. The checks use these before the domain's. |
 | `aliases` | The datasheet's other names for the pin (a slash-joined pin name, or a name per variant: `["MODE"]` beside `SYNC`). A symbol using any of them matches (2026-11-13). |
 | `contact` | On a connector, which pads are one contact (the two solder tails of a power contact): pads with the same `contact` must be on one net, or the board shorts them through it (`conn.contacts`). Only from the maker's drawing. |
+| `bond` | A second GPIO bonded to the same pad, enabled by a remap: `[{ "name": "PA9", "functions": ["I2C1_SCL AF6", …], "remap": "PINREMAP" }]` on PA11's pad. Using either GPIO takes the pad. `functions` are the second GPIO's own; the pin's `functions` stay the first's (2026-11-20). |
 | `note` | Anything else. |
 
 ## Values

@@ -52,7 +52,7 @@
         '<div class="seg" role="tablist">' + [['identity', 'Identity'], ['pins', 'Pins'], ['params', 'Parameters'], ['json', 'JSON']].map(([k, l]) => '<button data-tab="' + k + '" class="' + (st.tab === k ? 'on' : '') + '">' + l + (k === 'pins' && mism.length ? ' <span class="dot"></span>' : '') + '</button>').join('') + '</div>' +
         '<button class="icon-btn" data-ed="close" aria-label="Close" title="Close (Esc)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>' +
         '<div class="sheet-body pk-ed-body">' + body() + '</div>' +
-        '<div class="sheet-foot"><button class="btn btn-plain" data-ed="claude">Fill with Claude…</button><button class="btn btn-plain" data-ed="import">Import JSON…</button><button class="btn btn-plain" data-ed="export">Export</button>' +
+        '<div class="sheet-foot"><button class="btn btn-plain" data-ed="claude">Fill with Claude…</button><button class="btn btn-plain" data-ed="import">Import JSON…</button>' + (PK.cubemx ? '<button class="btn btn-plain" data-ed="cubemx" title="Read the MCU’s file from STM32CubeMX’s database on this computer">Import from CubeMX…</button>' : '') + '<button class="btn btn-plain" data-ed="export">Export</button>' +
         (opts.onDelete && !opts.isNew ? '<button class="btn btn-plain pk-danger-link" data-ed="delete">Delete</button>' : '') +
         '<span class="spacer"></span><button class="btn" data-ed="close">Cancel</button><button class="btn btn-primary" data-ed="save">Save</button></div>';
     }
@@ -83,7 +83,7 @@
     function pins() {
       const q = st.pinFilter.trim().toUpperCase();
       const domOpts = sel => '<option value=""></option>' + f.domains.map(d => '<option' + (d === sel ? ' selected' : '') + '>' + esc(d) + '</option>').join('');
-      const rows = f.pins.map((p, i) => [p, i]).filter(([p]) => !q || (p.num + ' ' + p.name + ' ' + (p.role || '') + ' ' + (p.functions || []).join(' ')).toUpperCase().includes(q));
+      const rows = f.pins.map((p, i) => [p, i]).filter(([p]) => !q || (p.num + ' ' + p.name + ' ' + (p.role || '') + ' ' + (p.functions || []).join(' ') + ' ' + (p.bond || []).map(x => x.name + ' ' + (x.functions || []).join(' ')).join(' ')).toUpperCase().includes(q));
       const bad = new Map(mism.map(m => [String(m.num), m]));
       return (mism.length ? '<div class="hint pk-warnbox"><b>▲ Pins differ from the schematic symbol (' + mism.length + ')</b>' + mism.slice(0, 8).map(m => 'Pin ' + esc(m.num) + ': schematic ' + (m.sch == null ? '(none)' : '“' + esc(m.sch) + '”') + ', file ' + (m.file == null ? '(none)' : '“' + esc(m.file) + '”')).join('<br>') + (mism.length > 8 ? '<br>…and ' + (mism.length - 8) + ' more' : '') + '</div>' : '') +
         '<div class="pk-ed-tools"><input class="input" data-id="pin-filter" placeholder="Filter pins (number, name, role, or function)" value="' + esc(st.pinFilter) + '"><span class="pk-muted">' + rows.length + ' of ' + f.pins.length + '</span><button class="btn btn-sm" data-ed="add-pin">Add pin</button></div>' +
@@ -92,13 +92,19 @@
           '<td><select class="input" data-pf="role">' + Object.entries(P.ROLES).map(([k, l]) => '<option value="' + k + '"' + (p.role === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></td>' +
           '<td><select class="input" data-pf="domain">' + domOpts(p.domain) + '</select></td>' +
           '<td class="pk-c"><input type="checkbox" data-pf="ft"' + (p.ft ? ' checked' : '') + '></td>' +
-          '<td><input class="input" data-pf="functions" value="' + esc((p.functions || []).join(', ')) + '"' + (['io', 'input', 'output', 'open-drain', 'analog'].includes(p.role) ? ' placeholder="USART2_TX AF1, EXTI9"' : '') + '></td>' +
+          '<td><input class="input" data-pf="functions" value="' + esc((p.functions || []).join(', ')) + '"' + (['io', 'input', 'output', 'open-drain', 'analog'].includes(p.role) ? ' placeholder="USART2_TX AF1, EXTI9"' : '') + '>' + bondNote(p) + '</td>' +
           '<td><select class="input" data-pf="reset">' + Object.entries(P.RESET_STATES).map(([k, l]) => '<option value="' + k + '"' + ((p.reset || '') === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></td>' +
           '<td><select class="input" data-pf="unused">' + Object.entries(P.UNUSED).map(([k, l]) => '<option value="' + k + '"' + ((p.unused || '') === k ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></td>' +
           '<td><input class="input pk-in-ext" data-pf="ext" value="' + esc(p.ext || '') + '" placeholder="' + (p.role === 'power-out' || p.role === 'power-in' ? '4.7 µF to GND' : '') + '"></td>' +
           '<td class="pk-vmax"><input class="input" data-pf="vmax" value="' + esc(p.vmax == null ? '' : p.vmax) + '" placeholder="rec."><input class="input" data-pf="absmax" value="' + esc(p.absmax == null ? '' : p.absmax) + '" placeholder="abs."></td>' +
           '<td><button class="icon-btn" data-ed="del-pin" title="Remove this pin" aria-label="Remove pin">×</button></td></tr>').join('') +
         '</tbody></table></div>';
+    }
+
+    // A pad bonded to a second GPIO (bond): shown under the functions, edited in the JSON tab.
+    function bondNote(p) {
+      if (!Array.isArray(p.bond) || !p.bond.length) return '';
+      return p.bond.map(x => '<div class="pk-note pk-bond" title="Using either GPIO takes this pad. Edit in the JSON tab.">⇄ Pad shared with <b>' + esc(x.name) + '</b>' + (x.remap ? ' (' + esc(x.remap) + ')' : '') + ': ' + esc((x.functions || []).join(', ')) + '</div>').join('');
     }
 
     function params() {
@@ -150,6 +156,7 @@
       else if (a === 'import') pickJson(text => applyJson(text, true));
       else if (a === 'apply-json') applyJson(sheet.querySelector('#pk-ed-json').value, false);
       else if (a === 'claude') claudeHelp();
+      else if (a === 'cubemx') fromCubeMX();
       else if (a === 'delete') { if (confirm('Delete ' + f.mpn + ' from the library' + (f.local && f.local.sha ? ' and from pincheck_data' : '') + '?')) { close(true); opts.onDelete(opts.file); } }
     });
 
@@ -164,6 +171,29 @@
       f.values = f.values || []; f.pins = f.pins || []; f.domains = f.domains || []; f.match = f.match || []; f.datasheet = f.datasheet || {};
       st.dirty = true; mism.splice(0, mism.length, ...(opts.part ? L.pinCheck(f, opts.part) : []));
       render(); if (window.PK.toast) PK.toast('Loaded ' + (g.mpn || 'the file') + ': ' + L.stats(f).values + ' values. Check them, then Save.');
+    }
+    // Import from CubeMX: the MCU's file from db/mcu (and its GPIO modes file from db/mcu/IP for the AF
+    // numbers), merged into this file as import_cubemx.py --merge does. Read in the page; nothing is sent.
+    function fromCubeMX() {
+      const C = PK.cubemx;
+      C.pickFiles(files => {
+        let n;
+        try { n = C.fromFiles(files, f.mpn); } catch (e) { alert(e.message); return; }
+        if (!n._afs && n._modes && confirm('For the alternate-function (AF) numbers, also pick ' + n._modes + ' from the IP folder inside db/mcu. Pick it now?')) {
+          C.pickFiles(more => { try { finish(C.fromFiles(files.concat(more), f.mpn)); } catch (e) { alert(e.message); } });
+          return;
+        }
+        finish(n);
+      });
+      function finish(n) {
+        if (f.mpn && !C.covers(n._ref, f.mpn) && !confirm(n._ref + ' doesn’t look like ' + f.mpn + '. Use it anyway?')) return;
+        const add = C.merge(f, n);
+        st.dirty = true; mism.splice(0, mism.length, ...(opts.part ? L.pinCheck(f, opts.part) : []));
+        st.tab = 'pins'; render();
+        const said = [add.pins && add.pins + ' pins', add.fields && add.fields + ' pin fields', add.signals && 'signals on ' + add.signals + ' pins', add.values && add.values + ' values'].filter(Boolean);
+        const text = 'From CubeMX (' + n._ref + '): ' + (said.length ? 'added ' + said.join(', ') : 'nothing new') + (n._afs ? '' : ', without AF numbers') + '. Check, then Save.';
+        if (window.PK.toast) PK.toast(text); else alert(text);
+      }
     }
     function msg(s) { const m = sheet.querySelector('#pk-json-msg'); if (m) m.textContent = s; else alert(s); }
 

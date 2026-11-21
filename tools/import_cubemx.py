@@ -5,13 +5,14 @@
     python tools/import_cubemx.py STM32G071KBU6 --merge exported.json --out stm32g071kbu6.json
 
 What CubeMX gives: the pins in the package (number, name, and type), each pin's signals with their
-alternate-function numbers, the EXTI line, the supply range, the temperature range, and the maximum
+alternate-function numbers, the EXTI line, a pad's second GPIO where two share it (`bond`), the
+peripheral instances (`peripherals`), the supply range, the temperature range, and the maximum
 clock. Everything it writes is marked unverified (src "import:cubemx"). What it doesn't give (absolute
 maximums, VIH/VIL, injection current, decoupling, oscillator gm, 5 V tolerance) comes from the
 datasheet, by hand or with the pincheck-part skill.
 
 --merge keeps an existing file's values and pin fields (from the schematic or a person) and only adds
-what's missing. CubeMX's database is ST's: its data goes only into the private library, never a
+what's missing: pin fields, signals, an AF number on a signal that has none, `bond`, and `peripherals`. CubeMX's database is ST's: its data goes only into the private library, never a
 public repo.
 """
 import argparse, glob, json, os, re, sys, xml.etree.ElementTree as ET
@@ -105,15 +106,42 @@ def af_table(db, mcu_root):
     return out
 
 
+# Instances in CubeMX's <IP> list that are software or core blocks, not peripherals with pins.
+NOT_PERIPHERALS = {'FATFS', 'FREERTOS', 'GUI_INTERFACE', 'TRACER_EMB', 'USB_DEVICE', 'USB_HOST', 'USBPD', 'NVIC',
+                   'DMA', 'GPIO', 'LWIP', 'MBEDTLS', 'PDM2PCM', 'TOUCHSENSING', 'GRAPHICS', 'LIBJPEG', 'STM32_WPAN',
+                   'THREADX', 'FILEX', 'USBX', 'NETXDUO', 'LEVELX', 'CORTEX_M0+', 'CORTEX_M4', 'CORTEX_M7', 'CORTEX_M33',
+                   'MEMORYMAP', 'PWR', 'BSP', 'X-CUBE', 'OPENAMP', 'RESMGR_UTILITY', 'MDMA', 'BDMA', 'GPDMA1', 'LPDMA1'}
+
+# Core, cache, security, and DMA blocks: on the chip, but not peripherals a connection uses.
+CORE_BLOCK = re.compile(r'^(CORTEX_M|NVIC\d*$|GTZC|SAU$|LINKEDLIST$|FLASH$|DEBUG$|BOOTPATH$|RAMCFG$|[ID]CACHE\d*$|SYS_S$|\w*DMA\d*$)')
+
+
+def signals(p, afs, raw, port):
+    out = []
+    for s in p.findall('m:Signal', NS):
+        sig = s.get('Name')
+        if not sig or sig == 'GPIO':
+            continue
+        af = afs.get((raw, sig))                            # "PA11 [PA9]", "PA14-BOOT0": the modes file's own name
+        if af is None and port:
+            af = afs.get((port, sig))
+        out.append(sig + (' AF%d' % af if af is not None else ''))
+    return out
+
+
 def build(db, mpn):
     name = find_mcu(db, mpn)
     root = ET.parse(os.path.join(db, name + '.xml')).getroot()
     afs = af_table(db, root)
     pins, domains = [], []
+    by_pos = {}
+    remaps = []
     for p in root.findall('m:Pin', NS):
         if p.get('Variant'):
+            remaps.append(p)                                # a second use of a pad, read below
             continue
-        nm = clean_pin(p.get('Name'))
+        raw = p.get('Name')
+        nm = clean_pin(raw)
         role = role_of(nm, p.get('Type'))
         pin = {'num': p.get('Position'), 'name': nm, 'role': role}
         port = re.match(r'^(P[A-K]\d{1,2})', nm)
@@ -125,18 +153,30 @@ def build(db, mpn):
                     domains.append(d)
         elif role in ('io', 'reset', 'boot', 'clock-in', 'clock-out'):
             pin['domain'] = 'VDD'
-        funcs = []
-        for s in p.findall('m:Signal', NS):
-            sig = s.get('Name')
-            if sig in ('GPIO',) or not sig:
-                continue
-            af = afs.get((port.group(1) if port else nm, sig))
-            funcs.append(sig + (' AF%d' % af if af is not None else ''))
+        funcs = signals(p, afs, raw, port.group(1) if port else None)
         if port:
             funcs.append('EXTI' + re.sub(r'^P[A-K]', '', port.group(1)))
         if funcs:
             pin['functions'] = funcs
         pins.append(pin)
+        by_pos.setdefault(pin['num'], pin)
+    # Pads bonded to a second GPIO ("PA9 [PA11]" on PA11's pad, enabled by a remap bit) become the pad's
+    # bond; other remapped uses of a pad (UCPD1_DBCC1) add their signal to the pad's functions.
+    for p in remaps:
+        pad = by_pos.get(p.get('Position'))
+        if pad is None:
+            continue
+        raw = p.get('Name')
+        port = re.match(r'^(P[A-K]\d{1,2})(?![0-9])', raw)
+        if port:
+            g = port.group(1)
+            funcs = signals(p, afs, raw, g) + ['EXTI' + re.sub(r'^P[A-K]', '', g)]
+            pad.setdefault('bond', []).append({'name': g, 'functions': funcs, 'remap': p.get('Variant')})
+        else:
+            have = {f.split(' ')[0] for f in pad.get('functions', [])}
+            for f in signals(p, afs, raw, None) or [clean_pin(raw)]:
+                if f.split(' ')[0] not in have:
+                    pad.setdefault('functions', []).append(f)
     pins.sort(key=lambda x: (len(x['num']), x['num']))
     v = root.find('m:Voltage', NS)
     t = root.find('m:Temperature', NS)
@@ -155,8 +195,28 @@ def build(db, mpn):
         'schema': 'pincheck.part/1', 'id': re.sub(r'[^a-z0-9]+', '-', mpn.lower()).strip('-'), 'mpn': mpn, 'match': [],
         'manufacturer': 'STMicroelectronics', 'kind': 'mcu', 'description': '%s %s, %s' % (root.findtext('m:Core', '', NS), root.get('Line', ''), root.get('Package', '')),
         'package': root.get('Package', ''), 'datasheet': {'title': '', 'rev': '', 'url': '', 'sha256': ''},
-        'pins': pins, 'domains': domains, 'values': values,
+        'peripherals': peripherals(root), 'pins': pins, 'domains': domains, 'values': values,
         'made': {'by': '', 'at': now, 'how': 'import:cubemx (%s)' % name}, 'updated': now}
+
+
+def peripherals(root):
+    names = {ip.get('InstanceName') for ip in root.findall('m:IP', NS)}
+    return sorted((n for n in names if n and n not in NOT_PERIPHERALS and not CORE_BLOCK.match(n)),
+                  key=lambda n: [int(t) if t.isdigit() else t for t in re.split(r'(\d+)', n)])
+
+
+def merge_functions(old, new):
+    # Keep the file's own entries; add signals it lacks, and an AF number to an entry that has none.
+    out = list(old)
+    idx = {f.split(' ')[0]: i for i, f in enumerate(out)}
+    for f in new:
+        sig = f.split(' ')[0]
+        if sig not in idx:
+            idx[sig] = len(out)
+            out.append(f)
+        elif ' AF' in f and ' AF' not in out[idx[sig]]:
+            out[idx[sig]] = f
+    return out
 
 
 def merge(old, new):
@@ -168,12 +228,14 @@ def merge(old, new):
             out.setdefault('pins', []).append(p)
             continue
         for k, val in p.items():
-            if k not in q or (k == 'role' and q.get('role') in (None, '', 'other')):
+            if k == 'functions' and q.get('functions'):
+                q[k] = merge_functions(q[k], val)
+            elif k not in q or (k == 'role' and q.get('role') in (None, '', 'other')):
                 q[k] = val
     have = {(x.get('k'), x.get('on', '')) for x in old.get('values', [])}
     out['values'] = list(old.get('values', [])) + [x for x in new['values'] if (x['k'], x.get('on', '')) not in have]
     out['domains'] = list(dict.fromkeys(old.get('domains', []) + new['domains']))
-    for k in ('manufacturer', 'package', 'description'):
+    for k in ('manufacturer', 'package', 'description', 'peripherals'):
         if not out.get(k):
             out[k] = new[k]
     out['kind'] = 'mcu'

@@ -897,6 +897,58 @@
     ok(html.includes('Board &lt;b&gt;') && !box.querySelector('h1 b'), 'name escaped');
   });
 
+  // A made-up CubeMX MCU file and GPIO modes file (the shape of STM32CubeMX's db/mcu, none of its data):
+  // pad 3 carries PA3, and PA1 by a remap; pad 1 also has a remapped non-GPIO use.
+  const CUBE_MCU = '<?xml version="1.0"?><Mcu xmlns="http://mcd.rou.st.com/modules.php?name=mcu" RefName="ACME32X(4-8)Tx" Package="LQFP8" Line="ACME32">' +
+    '<Core>ARM Cortex-M0+</Core><Frequency>48</Frequency><Voltage Min="1.8" Max="3.6"/><Temperature Min="-40" Max="85"/>' +
+    '<IP InstanceName="I2C1" Name="I2C"/><IP InstanceName="DAC1" Name="DAC"/><IP InstanceName="FREERTOS" Name="FREERTOS"/><IP InstanceName="GPIO" Name="GPIO" Version="ACME_gpio_v1"/>' +
+    '<Pin Name="PA0" Position="1" Type="I/O"><Signal Name="ADC1_IN0"/><Signal Name="I2C1_SCL"/><Signal Name="GPIO"/></Pin>' +
+    '<Pin Name="XYZ_DB" Position="1" Type="MonoIO" Variant="PINREMAP"/>' +
+    '<Pin Name="VDD" Position="2" Type="Power"/>' +
+    '<Pin Name="PA3 [PA1]" Position="3" Type="I/O"><Signal Name="USB_DM"/><Signal Name="DAC1_OUT1"/></Pin>' +
+    '<Pin Name="PA1 [PA3]" Position="3" Type="I/O" Variant="PINREMAP"><Signal Name="I2C1_SDA"/></Pin>' +
+    '<Pin Name="PA14-BOOT0" Position="4" Type="I/O"><Signal Name="SYS_SWCLK"/></Pin>' +
+    '<Pin Name="VSS" Position="5" Type="Power"/></Mcu>';
+  const CUBE_MODES = '<?xml version="1.0"?><IP xmlns="http://mcd.rou.st.com/modules.php?name=mcu" Name="GPIO">' +
+    '<GPIO_Pin Name="PA0"><PinSignal Name="I2C1_SCL"><SpecificParameter><PossibleValue>GPIO_AF6_I2C1</PossibleValue></SpecificParameter></PinSignal></GPIO_Pin>' +
+    '<GPIO_Pin Name="PA1 [PA3]"><PinSignal Name="I2C1_SDA"><SpecificParameter><PossibleValue>GPIO_AF6_I2C1</PossibleValue></SpecificParameter></PinSignal></GPIO_Pin>' +
+    '<GPIO_Pin Name="PA14-BOOT0"><PinSignal Name="SYS_SWCLK"><SpecificParameter><PossibleValue>GPIO_AF0_SWJ</PossibleValue></SpecificParameter></PinSignal></GPIO_Pin></IP>';
+  t('CubeMX import: shared pads, AF numbers by the modes file name, and peripherals', () => {
+    const C = PK.cubemx;
+    const f = C.fromFiles([{ name: 'm.xml', text: CUBE_MODES }, { name: 'p.xml', text: CUBE_MCU }], 'ACME32X8T6');
+    eq(f.peripherals, ['DAC1', 'I2C1']);
+    eq(f.pins.map(p => p.num), ['1', '2', '3', '4', '5']);
+    const p1 = f.pins.find(p => p.num === '1'), p3 = f.pins.find(p => p.num === '3'), p4 = f.pins.find(p => p.num === '4');
+    eq(p1.functions, ['ADC1_IN0', 'I2C1_SCL AF6', 'EXTI0', 'XYZ_DB']);
+    eq(p3.name, 'PA3 [PA1]');
+    eq(p3.bond, [{ name: 'PA1', functions: ['I2C1_SDA AF6', 'EXTI1'], remap: 'PINREMAP' }]);
+    eq([p4.role, p4.functions], ['boot', ['SYS_SWCLK AF0', 'EXTI14']]);
+    eq(f.pins.find(p => p.num === '2').domain, 'VDD');
+    ok(f._afs && C.covers(f._ref, 'ACME32X8T6') && !C.covers(f._ref, 'ACME32X6T6'));
+    eq(L.validate(Object.assign({}, f, { _ref: undefined })), []);
+    const bare = C.fromFiles([{ name: 'p.xml', text: CUBE_MCU }], '');
+    eq([bare.mpn, bare._afs, bare._modes], ['ACME32X(4-8)Tx', false, 'GPIO-ACME_gpio_v1_Modes.xml']);
+  });
+  t('CubeMX import: merge keeps the file, adds signals, AF numbers, bond, and peripherals', () => {
+    const C = PK.cubemx;
+    const n = C.fromFiles([{ name: 'p.xml', text: CUBE_MCU }, { name: 'm.xml', text: CUBE_MODES }], 'ACME32X8T6');
+    const f = { schema: 'pincheck.part/1', mpn: 'ACME32X8T6', kind: 'ic', values: [{ k: 'supply.range', on: 'VDD', min: 2, max: 3.6, unit: 'V' }],
+      pins: [{ num: '1', name: 'PA0', role: 'io', functions: ['I2C1_SCL', 'TIM9_CH1 AF3'], note: 'mine' }, { num: '3', name: 'PA3', role: 'other' }] };
+    const add = C.merge(f, n);
+    const p1 = f.pins.find(p => p.num === '1'), p3 = f.pins.find(p => p.num === '3');
+    eq(p1.functions, ['I2C1_SCL AF6', 'TIM9_CH1 AF3', 'ADC1_IN0', 'EXTI0', 'XYZ_DB']);
+    eq([p1.note, p3.name, p3.role], ['mine', 'PA3', 'io']);
+    eq(p3.bond[0].name, 'PA1');
+    eq(f.values.filter(v => v.k === 'supply.range').map(v => v.min), [2], 'the file’s own value stays');
+    eq([f.kind, f.peripherals], ['mcu', ['DAC1', 'I2C1']]);
+    eq(add.pins, 3);
+  });
+  t('validate: bond and peripherals', () => {
+    ok(L.validate(Object.assign({}, lib[0], { peripherals: 'I2C1' })).some(e => /peripherals/.test(e)));
+    ok(L.validate(Object.assign({}, lib[0], { pins: [{ num: '1', bond: [{ functions: [] }] }] })).some(e => /bond/.test(e)));
+    eq(L.validate(Object.assign({}, lib[0], { peripherals: ['I2C1'], pins: [{ num: '1', name: 'PA3', bond: [{ name: 'PA1', functions: ['I2C1_SDA AF6'] }] }] })), []);
+  });
+
   for (const [name, fn] of tests) {
     try { await fn(); out.push('✓ ' + name); } catch (e) { fails.push(name); out.push('✕ ' + name + '\n    ' + e.message); }
   }

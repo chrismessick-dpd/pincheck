@@ -187,7 +187,16 @@
     (file.pins || []).forEach((p, i) => {
       if (p.num == null || p.num === '') errs.push('pin ' + (i + 1) + ' has no num');
       if (p.role && !P.ROLES[p.role]) errs.push('pin ' + p.num + ': unknown role "' + p.role + '"');
+      if (p.functions != null && !Array.isArray(p.functions)) errs.push('pin ' + p.num + ': functions should be a list');
+      if (p.bond != null) {
+        if (!Array.isArray(p.bond)) errs.push('pin ' + p.num + ': bond should be a list');
+        else p.bond.forEach(b => {
+          if (!b || !b.name) errs.push('pin ' + p.num + ': a bond has no name');
+          else if (b.functions != null && !Array.isArray(b.functions)) errs.push('pin ' + p.num + ': bond ' + b.name + "'s functions should be a list");
+        });
+      }
     });
+    if (file.peripherals != null && !(Array.isArray(file.peripherals) && file.peripherals.every(x => typeof x === 'string' && x))) errs.push('peripherals should be a list of instance names');
     (file.values || []).forEach((v, i) => {
       const c = P.byKey.get(v.k);
       if (!v.k) errs.push('value ' + (i + 1) + ' has no k');

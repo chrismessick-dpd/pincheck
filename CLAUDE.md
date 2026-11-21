@@ -95,6 +95,16 @@ the suite's hard rules.
   off, rail ranges, strapped outputs; catalog `reg.vout.strap`, `sw.ilim.k`, `sw.default`, `sense.vfs`; pin `aliases` and
   `contact`), 7 ideas in the ledger. See `docs/checks.md`, *What a Claude scan taught them*, and `docs/learned.md`.
 
+- **Pin planner, phase 1: part data (2026-11-20, Chris).** For Scribe EE's MCU pin planner
+  (`docs/pin-planner.md`, lab `lab/pinmap.html`). Part files gain `peripherals` (the MCU's instances) and a pin's `bond`
+  (a second GPIO on the same pad, by a remap: G0 pads 33 and 34), in `docs/part-format.md` and `L.validate`.
+  `tools/import_cubemx.py` writes both and finds AF numbers by the modes file's own pin name (`PA11 [PA9]`,
+  `PC14-OSC32_IN`), and `--merge` adds AF numbers and signals to an existing file's functions. The part window has
+  **Import from CubeMX…** (`assets/cubemx.js`, `PK.cubemx`: the same import in the page from the picked
+  `db/mcu/<RefName>.xml` and `IP/GPIO-…_Modes.xml`; byte for byte the Python output on a real G0B1) and shows a shared
+  pad under its functions. Tests 56. The library's four STM32s re-imported at Chris's OK: `pincheck_data` `3c6d818` on
+  `8c7ef5b` (only those four files, proven additive by `C:/Dovetail/scratch/mcu-lab/reimport_dry.py`, read back).
+
 ## Rules
 
 - **No client data in this repo.** Not in code, docs, tests, demo, or commit messages. Real projects

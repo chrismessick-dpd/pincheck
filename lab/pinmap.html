@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- Design lab: an MCU pin planner for Scribe EE's MCU block (docs/pin-planner.md). Not loaded by any
+     tool. The built-in part (AC32G148) and its connections are made up. A real part file
+     (pincheck.part/1) and a list of connections can be opened from disk; nothing is uploaded or saved. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title>Pin planner lab</title>
+<link rel="stylesheet" href="../assets/suite.css">
+<link rel="stylesheet" href="pinmap.css">
+</head>
+<body class="pm-page">
+<header class="pm-head">
+  <div>
+    <div class="eyebrow">Pincheck lab · planning</div>
+    <h1 class="page-title">MCU pin planner</h1>
+    <p class="pm-note">Connections from the MCU block's Scribe lines, checked against the part's pins and alternate functions, and placed. Click a connection to light the pads it could use; click a pad to pick its function (a lock). The built-in part is <b>made up</b>; open a Pincheck part file to try a real one.</p>
+  </div>
+  <div class="pm-ctl">
+    <label class="btn" title="A pincheck.part/1 JSON file">Open part file…<input type="file" id="pm-part-file" accept=".json,application/json" hidden></label>
+    <button class="btn" id="pm-demo">Made-up part</button>
+    <button class="btn" id="pm-clear">Clear locks</button>
+    <button class="btn" id="pm-theme" title="Light or dark">Theme</button>
+  </div>
+</header>
+
+<main class="pm-main">
+  <aside class="pm-side">
+    <div class="pm-part" id="pm-part"></div>
+    <div class="pm-sum" id="pm-sum"></div>
+    <div class="pm-conns" id="pm-conns"></div>
+    <details class="pm-edit" id="pm-edit">
+      <summary>Connections as written in Scribe</summary>
+      <p class="pm-hint">One per line: <code>Block (label)</code>, as in a <code>Connects:</code> line. Add <code>, in</code> for a connection into the MCU.</p>
+      <textarea id="pm-text" spellcheck="false" rows="12"></textarea>
+      <div class="pm-edit-row">
+        <button class="btn btn-primary" id="pm-apply">Re-plan</button>
+        <label class="btn">Open list…<input type="file" id="pm-conn-file" accept=".txt,.md,text/plain" hidden></label>
+      </div>
+    </details>
+  </aside>
+
+  <section class="pm-stage">
+    <div class="pm-tabs">
+      <div class="seg" role="tablist" id="pm-views">
+        <button data-view="package">Package</button>
+        <button data-view="block">Block</button>
+        <button data-view="ports">Ports</button>
+        <button data-view="matrix">Matrix</button>
+        <button data-view="table">Table</button>
+      </div>
+      <div class="pm-legend" id="pm-legend"></div>
+    </div>
+    <div class="pm-view" id="pm-view"></div>
+  </section>
+</main>
+
+<div class="pm-pop" id="pm-pop" hidden></div>
+
+<script src="pinmap-demo.js"></script>
+<script src="pinmap.js"></script>
+</body>
+</html>
