@@ -104,6 +104,8 @@ the suite's hard rules.
   `db/mcu/<RefName>.xml` and `IP/GPIO-…_Modes.xml`; byte for byte the Python output on a real G0B1) and shows a shared
   pad under its functions. Tests 56. The library's four STM32s re-imported at Chris's OK: `pincheck_data` `3c6d818` on
   `8c7ef5b` (only those four files, proven additive by `C:/Dovetail/scratch/mcu-lab/reimport_dry.py`, read back).
+  Then (phase 2) the planner moved into Signoff's engine, `../ee_design_review/assets/pinmap.js`; the lab loads it from
+  there and only draws.
 
 ## Rules
 

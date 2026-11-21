@@ -9,237 +9,22 @@
     set(k, v) { try { localStorage.setItem('pinmap.lab.' + k, JSON.stringify(v)); } catch (e) { /* private window */ } },
   };
 
-  // ---------- The part ----------
+  // ---------- The planner: Signoff's engine module (ee_design_review/assets/pinmap.js) ----------
 
-  const FIXED = new Set(['power-in', 'power-out', 'ground', 'nc', 'dnc', 'pad']);
+  const P = window.SignoffPinmap;
+  const { FIXED, TYPES, portOf } = P;
+  const natCmp = P.nat;
+  const sevOf = P.sevOf;
 
-  function parseFn(s, gpio) {
-    const m = /^([A-Z][A-Z0-9]*?)(\d*)_(.+?)(?:\s+AF(\d+))?$/.exec(s.trim());
-    if (!m) return null;                                       // EXTI0 and the like: properties of the GPIO
-    return { full: s.trim().replace(/\s+AF\d+$/, ''), fam: m[1], inst: m[1] + m[2], sig: m[3], af: m[4] == null ? null : +m[4], gpio };
-  }
-  const baseName = (n) => String(n).split(/[-\s[]/)[0];        // "PA14-BOOT0" → PA14, "PA11 [PA9]" → PA11
-  const portOf = (n) => { const m = /^P([A-Z])(\d+)$/.exec(baseName(n)); return m ? { port: m[1], bit: +m[2] } : null; };
-
-  function loadPart(part) {
-    const pads = (part.pins || []).map((p) => {
-      const names = [baseName(p.name)].concat((p.bond || []).map((b) => baseName(b.name)));
-      const fns = [];
-      (p.functions || []).forEach((f) => { const x = parseFn(f, names[0]); if (x) fns.push(x); });
-      (p.bond || []).forEach((b) => (b.functions || []).forEach((f) => { const x = parseFn(f, baseName(b.name)); if (x) fns.push(x); }));
-      const also = (p.name.split('-').slice(1).join('-') || '').replace(/\s*\(.*$/, '');
-      return { num: p.num, name: p.name, names, role: p.role || 'io', fns, also, bonded: names.length > 1,
-        gpio: !FIXED.has(p.role) && !!portOf(names[0]) };
-    });
-    const insts = new Set(part.peripherals || []);
-    pads.forEach((p) => p.fns.forEach((f) => insts.add(f.inst)));
-    const byName = {};
-    pads.forEach((p) => p.names.forEach((n) => { byName[n] = p; }));
-    return { meta: part, pads, insts: [...insts].sort(natCmp), byName, byNum: Object.fromEntries(pads.map((p) => [p.num, p])) };
-  }
-  function natCmp(a, b) { return String(a).localeCompare(String(b), 'en', { numeric: true }); }
-
-  // ---------- Reading a connection label ----------
-
-  const TYPES = {
-    I2C: { fams: ['I2C'], sigs: ['SCL', 'SDA'], bus: true, words: ['i2c', 'iic', 'smbus', 'twi'] },
-    SPI: { fams: ['SPI'], sigs: ['SCK', 'MOSI', 'MISO'], bus: true, words: ['spi'] },
-    UART: { fams: ['USART', 'UART', 'LPUART'], sigs: ['TX', 'RX'], bus: true, words: ['uart', 'usart', 'lpuart', 'serial'] },
-    USB: { fams: ['USB'], sigs: ['DM', 'DP'], bus: true, words: ['usb'] },
-    CAN: { fams: ['FDCAN', 'CAN'], sigs: ['RX', 'TX'], bus: true, words: ['can', 'fdcan'] },
-    SWD: { fams: ['SYS'], sigs: ['SWDIO', 'SWCLK'], bus: true, words: ['swd'] },
-    I2S: { fams: ['I2S'], sigs: ['CK', 'SD', 'WS'], bus: true, words: ['i2s'] },
-    ADC: { fams: ['ADC'], pat: /^IN\d+$/, words: ['adc', 'analog'], one: 'channel' },
-    DAC: { fams: ['DAC'], pat: /^OUT\d+$/, words: ['dac'], one: 'output' },
-    TIM: { fams: ['TIM', 'LPTIM'], pat: /^CH\d+$/, words: ['pwm', 'tim', 'timer'], one: 'channel' },
-    TSC: { fams: ['TSC'], pat: /^G\d+_IO\d+$/, words: ['touch', 'tsc', 'capsense'], one: 'touch channel' },
-    PINS: { words: [] },
-    GPIO: { words: ['gpio', 'drive', 'io', 'digital', 'led', 'relay', 'enable', 'irq', 'interrupt', 'input', 'output'] },
-  };
-  const INST_RE = /\b(I2C|SPI|LPUART|USART|UART|DAC|ADC|LPTIM|TIM|FDCAN|CAN|I2S)(\d+)\b/i;
-
-  function parseLabel(raw) {
-    const parts = raw.split(',').map((s) => s.trim());
-    let main = parts.shift() || '';
-    const dir = parts.find((p) => /^(in|out|both ways)$/i.test(p)) || 'out';
-    const items = [];
-    const pinRe = /\bP([A-Z])(\d+)\s*[–—-]\s*P?([A-Z])?(\d+)\b|\bP[A-Z]\d+\b/g;
-    const pins = [];
-    let m;
-    while ((m = pinRe.exec(main))) {
-      if (m[2] != null) { const port = m[1]; for (let b = +m[2]; b <= +m[4]; b++) pins.push('P' + port + b); }
-      else pins.push(m[0]);
-    }
-    if (pins.length) return { dir, items: [{ type: 'PINS', pins, text: main }] };
-    main.split('+').forEach((chunk) => {
-      chunk = chunk.trim();
-      const cm = /^(\d+)\s*[x×]?\s+(.*)$/.exec(chunk);
-      const count = cm ? +cm[1] : 1;
-      const body = cm ? cm[2] : chunk;
-      const im = INST_RE.exec(body);
-      const words = body.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
-      let type = null;
-      if (im) type = Object.keys(TYPES).find((t) => (TYPES[t].fams || []).some((f) => f === im[1].toUpperCase()) || (t === 'UART' && /UART/i.test(im[1])));
-      if (!type) type = Object.keys(TYPES).find((t) => TYPES[t].words.some((w) => words.includes(w)));
-      const known = new Set([].concat(...Object.values(TYPES).map((t) => t.words)));
-      const sm = /\b(OUT|CH|IN)(\d+)\b/i.exec(body);
-      const extra = words.filter((w) => !known.has(w) && !(im && w === im[0].toLowerCase()) && !(sm && w === sm[0].toLowerCase()) && !/^\d+$/.test(w));
-      items.push({ type: type || 'GPIO', guessed: !type, inst: im ? im[1].toUpperCase().replace(/^UART$/, 'USART') + im[2] : null,
-        reqInst: im ? im[0].toUpperCase() : null, sig: sm ? sm[1].toUpperCase() + sm[2] : null, count, extra, text: chunk });
-    });
-    return { dir, items };
-  }
-
+  // The lab's own reader of the connection text: one Scribe connection per line, "Block (label)".
   function parseConnects(text) {
     const out = [];
     text.split(/\r?\n/).forEach((line, i) => {
       line = line.replace(/^\s*(Connects:|[-*])\s*/i, '').trim();
       if (!line) return;
       const m = /^(.*?)\s*\((.*)\)\s*$/.exec(line);
-      if (!m) { out.push({ line: i, block: line, label: '', parsed: { dir: 'out', items: [{ type: 'GPIO', guessed: true, count: 1, extra: [], text: '' }] } }); return; }
-      out.push({ line: i, block: m[1], label: m[2], parsed: parseLabel(m[2]) });
-    });
-    return out;
-  }
-
-  // Requirements: one per interface a label asks for; a bus label on several blocks is one requirement.
-  function requirements(conns) {
-    const reqs = [];
-    const byKey = {};
-    conns.forEach((c, ci) => c.parsed.items.forEach((it, ii) => {
-      const T = TYPES[it.type] || {};
-      const key = T.bus ? it.type + '|' + (it.inst || it.text.toLowerCase()) : null;
-      if (key && byKey[key]) { byKey[key].users.push({ block: c.block, ci }); return; }
-      const r = { id: 'r' + ci + '.' + ii, key, type: it.type, item: it, label: c.label, dir: c.parsed.dir,
-        users: [{ block: c.block, ci }], line: c.line, slots: [], problems: [], notes: [], inst: null, fix: null };
-      if (key) byKey[key] = r;
-      reqs.push(r);
-    }));
-    return reqs;
-  }
-
-  // ---------- Placing ----------
-
-  function plan(part, conns, locks) {
-    const reqs = requirements(conns);
-    const used = {};                     // pad num → { req, sig, fn }
-    const claimed = {};                  // instance → req (buses)
-    const take = (pad, req, sig, fn, lock) => { used[pad.num] = { req, sig, fn, lock: !!lock }; req.slots.push({ pad: pad.num, sig, fn, gpio: fn ? fn.gpio : pad.names[0], lock: !!lock }); };
-
-    // Checks against the part before placing.
-    reqs.forEach((r) => {
-      const T = TYPES[r.type];
-      if (r.item.guessed) r.notes.push({ sev: 'warn', text: `“${r.item.text}” names no interface; planned as ${r.item.count > 1 ? r.item.count + ' GPIOs' : 'one GPIO'}.` });
-      if (r.item.extra && r.item.extra.length && !r.item.guessed) r.notes.push({ sev: 'info', text: `Read past: ${r.item.extra.join(' ')}.` });
-      if (r.users.length > 1) r.notes.push({ sev: 'info', text: `One bus for ${r.users.length} blocks.` });
-      if (!T || !T.fams) return;
-      const have = part.insts.filter((i) => T.fams.includes(i.replace(/\d+$/, '')));
-      if (!have.length) {
-        r.problems.push(`This part has no ${r.type === 'TSC' ? 'touch controller (TSC)' : r.type}.`);
-        r.dead = true; return;
-      }
-      if (r.item.inst && !have.includes(r.item.inst)) {
-        r.dead = true;
-        const n = +r.item.inst.replace(/^\D+/, '');
-        const one = have[0];
-        const chans = T.pat ? [...new Set(part.pads.flatMap((p) => p.fns.filter((f) => f.inst === one && T.pat.test(f.sig)).map((f) => f.sig)))].sort(natCmp) : [];
-        if (T.pat && have.length === 1 && chans[n - 1]) {
-          r.problems.push(`No ${r.item.inst} on this part. It has one ${r.type}, ${one}, with ${chans.join(' and ')}: did you mean ${one}_${chans[n - 1]}?`);
-          r.fix = { from: r.item.reqInst, to: one + ' ' + chans[n - 1] };
-        } else r.problems.push(`No ${r.item.inst} on this part. It has ${have.join(', ')}.`);
-      }
-    });
-
-    // Locks first (the person's picks), then explicit pins, then the most constrained.
-    Object.entries(locks).forEach(([num, l]) => {
-      const pad = part.byNum[num]; if (!pad) return;
-      const r = reqs.find((q) => q.id === l.req) || null;
-      const fn = l.fn ? pad.fns.find((f) => f.full === l.fn) : null;
-      if (r && !r.dead) { take(pad, r, l.sig, fn, true); if (fn && TYPES[r.type].bus) { r.inst = fn.inst; claimed[fn.inst] = r; } }
-      else used[num] = { req: null, sig: l.fn || 'GPIO', fn, lock: true, stray: true };
-    });
-
-    const order = reqs.filter((r) => !r.dead).map((r) => ({ r, n: r.type === 'PINS' ? -1 : r.slots.length ? 0 : options(part, r) })).sort((a, b) => a.n - b.n).map((x) => x.r);
-    order.forEach((r) => place(part, r, used, claimed, take));
-    const stray = Object.entries(used).filter(([, u]) => u.stray).map(([num, u]) => ({ num, fn: u.sig }));
-    return { reqs, used, stray };
-  }
-
-  function options(part, r) {
-    const T = TYPES[r.type];
-    if (r.type === 'GPIO') return 500;
-    return part.pads.reduce((n, p) => n + p.fns.filter((f) => T.fams.includes(f.fam) && (!r.item.inst || f.inst === r.item.inst) && (!r.item.sig || f.sig === r.item.sig)).length, 0);
-  }
-  const free = (used, pad, r) => !used[pad.num] || used[pad.num].req === r;
-  const cost = (p) => p.fns.length + (p.bonded ? 3 : 0);
-
-  function place(part, r, used, claimed, take) {
-    const T = TYPES[r.type];
-    if (r.type === 'PINS') {
-      r.item.pins.forEach((n) => {
-        const pad = part.byName[n];
-        if (!pad) { r.problems.push(`${n} isn't bonded in ${part.meta.package || 'this package'}.`); return; }
-        const u = used[pad.num];
-        if (u && u.req !== r) { r.problems.push(`${n} is taken by ${who(u)}.`); return; }
-        if (!u) take(pad, r, n, null);
-        if (pad.also) r.notes.push({ sev: 'info', text: `${n} is also ${pad.also}.` });
-      });
-      return;
-    }
-    if (r.type === 'GPIO') {
-      const need = r.item.count - r.slots.length;
-      const pads = part.pads.filter((p) => p.gpio && p.role === 'io' && !used[p.num]).sort((a, b) => cost(a) - cost(b) || natCmp(a.num, b.num));
-      pads.slice(0, need).forEach((p) => take(p, r, 'GPIO', null));
-      if (pads.length < need) r.problems.push(`Only ${pads.length} free GPIO left for ${need}.`);
-      return;
-    }
-    if (T.bus) {
-      const locked = r.inst;
-      const insts = part.insts.filter((i) => T.fams.includes(i.replace(/\d+$/, '')) && (!r.item.inst || i === r.item.inst) && (!locked || i === locked) && (!claimed[i] || claimed[i] === r))
-        .sort((a, b) => T.fams.indexOf(a.replace(/\d+$/, '')) - T.fams.indexOf(b.replace(/\d+$/, '')) || natCmp(a, b));
-      for (const inst of insts) {
-        const have = Object.fromEntries(r.slots.map((s) => [s.sig, s]));
-        const pick = {};
-        const sigs = T.sigs.filter((s) => !have[s]);
-        const cands = sigs.map((s) => part.pads.filter((p) => free(used, p, r) && !have[s] && p.fns.some((f) => f.inst === inst && f.sig === s)).sort((a, b) => cost(a) - cost(b)));
-        const go = (k, taken) => {
-          if (k === sigs.length) return true;
-          for (const p of cands[k]) { if (taken.has(p.num)) continue; pick[sigs[k]] = p; taken.add(p.num); if (go(k + 1, taken)) return true; taken.delete(p.num); }
-          return false;
-        };
-        if (go(0, new Set(r.slots.map((s) => s.pad)))) {
-          sigs.forEach((s) => { const p = pick[s]; take(p, r, s, p.fns.find((f) => f.inst === inst && f.sig === s)); });
-          r.inst = inst; claimed[inst] = r; return;
-        }
-      }
-      // Say why: which pads it could have used, and who holds them.
-      const all = part.insts.filter((i) => T.fams.includes(i.replace(/\d+$/, '')) && (!r.item.inst || i === r.item.inst));
-      const held = all.filter((i) => claimed[i] && claimed[i] !== r).map((i) => `${i} (${claimed[i].users[0].block})`);
-      const blockers = new Set();
-      part.pads.forEach((p) => p.fns.forEach((f) => { if (all.includes(f.inst) && T.sigs.includes(f.sig) && used[p.num] && used[p.num].req !== r) blockers.add(`${p.names[0]} (${who(used[p.num])})`); }));
-      r.problems.push(`No room for ${r.item.inst || r.type}.` + (held.length ? ` In use: ${held.join(', ')}.` : '') + (blockers.size ? ` Its pads are taken: ${[...blockers].slice(0, 5).join(', ')}.` : ''));
-      return;
-    }
-    // Channels (ADC, DAC, timer, touch): any instance, distinct pads.
-    const need = r.item.count - r.slots.length;
-    const ok = (f) => T.fams.includes(f.fam) && T.pat.test(f.sig) && (!r.item.inst || f.inst === r.item.inst) && (!r.item.sig || f.sig === r.item.sig);
-    const pads = part.pads.filter((p) => !used[p.num] && p.fns.some(ok)).sort((a, b) => cost(a) - cost(b));
-    pads.slice(0, need).forEach((p) => { const f = p.fns.find(ok); take(p, r, f.sig, f); });
-    if (pads.length < need) r.problems.push(`Only ${pads.length} free ${r.type} ${T.one}${pads.length === 1 ? '' : 's'} for ${need}.`);
-  }
-  const who = (u) => (u.req ? u.req.users[0].block : 'a pick of yours');
-
-  // Which pads could serve a requirement (for the candidate rings), and with which function.
-  function candidates(part, r, used) {
-    const out = {};
-    if (!r || r.dead) return out;
-    const T = TYPES[r.type];
-    part.pads.forEach((p) => {
-      const taken = !!(used[p.num] && used[p.num].req !== r);
-      if (r.type === 'PINS') { if (r.item.pins.some((n) => p.names.includes(n))) out[p.num] = { f: null, taken }; return; }
-      if (r.type === 'GPIO') { if (p.gpio && !taken) out[p.num] = { f: null, taken }; return; }
-      const f = p.fns.find((x) => T.fams.includes(x.fam) && (!r.item.inst || x.inst === r.item.inst) && (T.bus ? T.sigs.includes(x.sig) : T.pat.test(x.sig) && (!r.item.sig || x.sig === r.item.sig)));
-      if (f) out[p.num] = { f, taken };
+      if (!m) { out.push({ id: 'l' + i, line: i, block: line, label: '' }); return; }
+      out.push({ id: 'l' + i, line: i, block: m[1], label: m[2] });
     });
     return out;
   }
@@ -250,16 +35,15 @@
     part: null, text: '', view: store.get('view', 'package'), sel: null, locks: {}, result: null, real: false,
   };
   function setPart(raw, real) {
-    S.part = loadPart(raw); S.real = real; S.locks = {}; S.sel = null; replan();
+    S.part = P.part(raw); S.real = real; S.locks = {}; S.sel = null; replan();
   }
   function replan() {
     S.conns = parseConnects(S.text);
-    S.result = plan(S.part, S.conns, S.locks);
+    S.result = P.plan(S.part, S.conns, S.locks);
     if (S.sel && !S.result.reqs.find((r) => r.id === S.sel)) S.sel = null;
     render();
   }
   const selReq = () => (S.result.reqs.find((r) => r.id === S.sel) || null);
-  function sevOf(r) { return r.problems.length ? 'issue' : r.notes.some((n) => n.sev === 'warn') ? 'warn' : 'ok'; }
   function padState(num) {
     const pad = S.part.byNum[num];
     const u = S.result.used[num];
@@ -304,7 +88,7 @@
       const pins = r.slots.slice().sort((a, b) => natCmp(a.sig, b.sig)).map((s) => `<span class="pm-pin${s.lock ? ' lock' : ''}">${esc(s.gpio)}${s.sig && s.sig !== s.gpio && s.sig !== 'GPIO' ? ' <i>' + esc(s.sig) + '</i>' : ''}</span>`).join('');
       const what = r.type === 'PINS' ? 'Pins' : (r.inst || r.item.inst || r.type) + (r.item.count > 1 ? ' × ' + r.item.count : '');
       const blocks = r.users.map((u) => esc(u.block)).join(', ');
-      const notes = r.problems.map((t) => `<li class="issue">${esc(t)}</li>`).concat(r.notes.map((n) => `<li class="${n.sev}">${esc(n.text)}</li>`)).join('');
+      const notes = r.problems.map((t) => `<li class="issue">${esc(t.text)}</li>`).concat(r.notes.map((n) => `<li class="${n.sev}">${esc(n.text)}</li>`)).join('');
       return `<div class="pm-conn ${sev}${S.sel === r.id ? ' sel' : ''}" data-req="${r.id}" tabindex="0">
         <div class="pm-conn-top"><span class="pm-mark ${sev}">${mark}</span><span class="pm-what">${esc(what)}</span><span class="pm-blocks">${blocks}</span></div>
         <div class="pm-conn-label">“${esc(r.item.text || r.label)}”${r.dir !== 'out' ? ' · ' + esc(r.dir) : ''}</div>
@@ -323,7 +107,7 @@
   function renderView() {
     $('#pm-legend').innerHTML = LEGEND.map(([k, t]) => `<span class="pm-lg"><i class="pm-sw ${k}"></i>${t}</span>`).join('');
     const r = selReq();
-    S.cand = candidates(S.part, r, S.result.used);
+    S.cand = P.candidates(S.part, r, S.result.used);
     const v = $('#pm-view');
     v.className = 'pm-view v-' + S.view;
     v.innerHTML = ({ package: viewPackage, block: viewBlock, ports: viewPorts, matrix: viewMatrix, table: viewTable }[S.view] || viewPackage)();
@@ -522,18 +306,16 @@
     const p = S.part.byNum[num];
     const u = S.result.used[num];
     const r = selReq();
-    const fits = (f) => S.result.reqs.filter((q) => !q.dead && TYPES[q.type].fams && TYPES[q.type].fams.includes(f.fam) && (!q.item.inst || q.item.inst === f.inst) && (TYPES[q.type].bus ? TYPES[q.type].sigs.includes(f.sig) : TYPES[q.type].pat.test(f.sig)));
+    const ch = P.choices(S.part, S.result, num, S.sel);
     const groups = {};
-    p.fns.forEach((f) => { (groups[f.fam] = groups[f.fam] || []).push(f); });
+    ch.forEach((c) => { (groups[c.fn.fam] = groups[c.fn.fam] || []).push(c); });
     const order = Object.keys(groups).sort((a, b) => {
       const fa = r && TYPES[r.type].fams && TYPES[r.type].fams.includes(a) ? 0 : 1, fb = r && TYPES[r.type].fams && TYPES[r.type].fams.includes(b) ? 0 : 1;
       return fa - fb || natCmp(a, b);
     });
-    const items = order.map((fam) => `<div class="pm-pop-g">${esc(fam)}</div>` + groups[fam].map((f) => {
-      const qs = fits(f);
-      const q = (r && qs.includes(r)) ? r : qs[0];
-      const on = u && u.fn && u.fn.full === f.full;
-      return `<button class="pm-pop-i${on ? ' on' : ''}${q ? ' fit' : ''}" data-fn="${esc(f.full)}" data-req="${q ? q.id : ''}"><span>${esc(f.full)}${p.bonded ? ' <small>[' + esc(f.gpio) + ']</small>' : ''}</span><small>${f.af != null ? 'AF' + f.af : 'analog / extra'}${q ? ' · ' + esc(q.users[0].block) : ' · not in Scribe'}</small></button>`;
+    const items = order.map((fam) => `<div class="pm-pop-g">${esc(fam)}</div>` + groups[fam].map(({ fn: f, req: q }) => {
+      const on = u && u.fn && u.fn.full === f.full && u.fn.gpio === f.gpio;
+      return `<button class="pm-pop-i${on ? ' on' : ''}${q ? ' fit' : ''}" data-fn="${esc(f.full)}" data-gpio="${esc(f.gpio)}" data-req="${q ? q.id : ''}"><span>${esc(f.full)}${p.bonded ? ' <small>[' + esc(f.gpio) + ']</small>' : ''}</span><small>${f.af != null ? 'AF' + f.af : 'analog / extra'}${q ? ' · ' + esc(q.users[0].block) : ' · not in Scribe'}</small></button>`;
     }).join('')).join('');
     const gpioFor = r && (r.type === 'GPIO' || r.type === 'PINS') && p.gpio ? `<button class="pm-pop-i fit" data-fn="" data-req="${r.id}"><span>GPIO</span><small>${esc(r.users[0].block)}</small></button>` : '';
     const pop = $('#pm-pop');
@@ -554,16 +336,9 @@
   }
   function closePop() { $('#pm-pop').hidden = true; }
 
-  function pick(num, fnFull, reqId) {
-    const r = S.result.reqs.find((q) => q.id === reqId);
-    const p = S.part.byNum[num];
-    const f = fnFull ? p.fns.find((x) => x.full === fnFull) : null;
-    // A bus pick moves the whole bus onto that instance: drop the bus's locks on other instances.
-    if (r && f && TYPES[r.type].bus) Object.keys(S.locks).forEach((k) => { const l = S.locks[k]; if (l.req === r.id && l.fn && !l.fn.startsWith(f.inst + '_')) delete S.locks[k]; });
-    Object.keys(S.locks).forEach((k) => { const l = S.locks[k]; if (r && l.req === r.id && f && l.sig === f.sig && k !== num) delete S.locks[k]; });
-    S.locks[num] = { req: r ? r.id : null, fn: f ? f.full : null, sig: f ? f.sig : (p.names[0]) };
-    if (r && (r.type === 'GPIO' || r.type === 'PINS')) S.locks[num].sig = r.type === 'PINS' ? p.names[0] : 'GPIO';
-    if (r) S.sel = r.id;
+  function pick(num, fnFull, reqId, gpio) {
+    S.locks = P.pick(S.locks, S.result, S.part, num, fnFull, reqId, gpio);
+    if (reqId) S.sel = reqId;
     closePop(); replan();
   }
 
@@ -576,7 +351,8 @@
       if (fx) {
         const r = S.result.reqs.find((q) => q.id === fx.dataset.fix);
         const lines = S.text.split(/\r?\n/);
-        lines[r.line] = lines[r.line].replace(r.fix.from, r.fix.to);
+        const ln = r.users[0].conn.line;
+        lines[ln] = lines[ln].replace(r.fix.from, r.fix.to);
         S.text = lines.join('\n'); $('#pm-text').value = S.text; replan(); return;
       }
       const row = e.target.closest('[data-req]');
@@ -592,8 +368,8 @@
     $('#pm-pop').addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
       const num = $('#pm-pop').dataset.pad;
-      if (b.dataset.unlock) { delete S.locks[num]; closePop(); replan(); return; }
-      pick(num, b.dataset.fn, b.dataset.req);
+      if (b.dataset.unlock) { S.locks = P.unpick(S.locks, num); closePop(); replan(); return; }
+      pick(num, b.dataset.fn, b.dataset.req, b.dataset.gpio);
     });
     document.addEventListener('click', (e) => { if (!e.target.closest('#pm-pop') && !e.target.closest('[data-pad]')) closePop(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closePop(); if (S.sel) { S.sel = null; render(); } } });
@@ -628,5 +404,5 @@
   $('#pm-text').value = S.text;
   wire();
   setPart(window.PM_DEMO.part, false);
-  window.PM = { S, parseLabel, plan, loadPart, replan };   // for the console and tests
+  window.PM = { S, P, replan };   // for the console
 })();

@@ -164,8 +164,11 @@ other.
 1. **Part data (built 2026-11-20; the library's STM32s re-imported, `pincheck_data` `3c6d818`):** `import_cubemx.py` writes `bond` and `peripherals`; the format doc and
    `tools/part.js check` learn them; Pincheck's Pins tab shows a shared pad. Re-import the STM32s
    already in the library (dry run first). Then *Import from CubeMX…* in the part window.
-2. **The planner as an engine module** (`assets/pinmap.js`, pure: label reading, grouping, checks,
-   placement), with tests from the lab's cases and the real board above (read-only).
+2. **The planner as an engine module (built 2026-11-20):** `ee_design_review/assets/pinmap.js`
+   (`window.SignoffPinmap`, pure: label reading, grouping, checks, placement, candidates, picks), with EE tests on a
+   made-up part; the lab draws it. Requirement ids are stable (`bus:I2C|I2C1`, `<connection id>#<item>`), so picks
+   stored by pad survive edits. On the real board, read-only: the same catches as above, and after the DAC fix
+   DAC1_OUT2 goes to the function generator and DAC1_OUT1 to the buck.
 3. **Scribe EE:** Pincheck's library and part window loaded from `../pincheck/assets/`, the block's
    `Part:` line with its picker and *New part…*, the copy into the review, the Pins section in the
    panel, the full-window pin map, and marks on connection lines. EE only (ME and FW get the synced
