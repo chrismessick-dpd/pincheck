@@ -253,7 +253,8 @@
   }
 
   function pickJson(cb) {
-    const i = document.getElementById('json-input');
+    let i = document.getElementById('json-input');
+    if (!i) { i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json'; i.multiple = true; }   // another tool's page
     i.value = '';
     i.onchange = async () => { for (const file of i.files) cb(await file.text(), file.name); };
     i.click();

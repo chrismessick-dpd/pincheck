@@ -106,6 +106,11 @@ the suite's hard rules.
   `8c7ef5b` (only those four files, proven additive by `C:/Dovetail/scratch/mcu-lab/reimport_dry.py`, read back).
   Then (phase 2) the planner moved into Signoff's engine, `../ee_design_review/assets/pinmap.js`, and (phase 3) the views
   too, `pinview.js`; the lab loads both, and EE's `styles.css`, and supplies only a part and connections.
+  Then the part window opens in Signoff EE too (New part… and Edit part… on an MCU block): its styles moved to
+  `assets/editor.css` (Pincheck loads it after `styles.css`; `pk-muted`, `pk-note`, `pk-mono`, `pk-scroll`, `pk-btns`,
+  and `pk-steps` keep copies in `styles.css`), `library.js` takes a page's token from `PK.tokenSource` when there's no
+  `SignoffFoot`, and `pickJson` makes its own file input on a page without `#json-input`. Change the part window
+  knowing EE loads it from `../pincheck/assets/`.
 
 ## Rules
 

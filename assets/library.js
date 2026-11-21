@@ -237,8 +237,10 @@
   const dump = f => JSON.stringify(strip(f), null, 2) + '\n';
 
   // ── Sync with pincheck_data ──
+  // The GitHub token: Pincheck's sign-in (the hub's sidefoot.js), or a page's own (PK.tokenSource, set by Signoff EE,
+  // which opens the part window too; 2026-11-20, docs/pin-planner.md).
   async function token() {
-    const w = window.SignoffFoot ? window.SignoffFoot.who() : { token: '' };
+    const w = window.SignoffFoot ? window.SignoffFoot.who() : typeof PK.tokenSource === 'function' ? { token: PK.tokenSource() || '' } : { token: '' };
     if (!w.token) return '';
     const A = window.SignoffAuth;
     return A && A.owns && A.owns(w.token) ? A.token() : w.token;
