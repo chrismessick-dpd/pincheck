@@ -67,18 +67,17 @@
     // The thermostat's Main PCBA MCU block (made up), with two labels the part can't do and a
     // byte-wide header that takes I2C1's usual pins.
     connects: [
-      'Wi-Fi module (UART)',
-      'Display connector (I2C1)',
-      'Display connector (DAC2)',
+      // One entry per block, its signals joined with + (2026-11-21): Display connector carries three.
+      'Wi-Fi module (UART + WIFI_EN)',
+      'Display connector (I2C1 + DAC2 + BL_EN)',
       'Light sensor (ADC, in)',
       'USB-C service port (USB, in)',
       'Debug header (PA13/PA14, in)',
-      'Relay outputs (2 drive)',
+      'Relay outputs (RLY1 + RLY2)',
       'Status LEDs (2 GPIO)',
       'Buzzer (TIM PWM)',
       'Touch keys (touch sense, in)',
       'Expansion header (PB8–PB15)',
-      'Display connector (BL_EN)',
     ].join('\n'),
   };
 })();
