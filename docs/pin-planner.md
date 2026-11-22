@@ -188,3 +188,4 @@ other.
    the part's own peripherals; stored as `pins.types` on the MCU block, the label untouched.
 7. Assignments are stored and change only on Auto-assign or a pick; a row's lock freezes its pins, and Unassign
    skips locked rows (Chris, 2026-11-21).
+8. Clock and special pins are connection types too: HSE, LSE, MCO, BOOT0, and NRST (Chris, 2026-11-21).

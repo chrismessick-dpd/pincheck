@@ -78,6 +78,8 @@
       'Buzzer (TIM PWM)',
       'Touch keys (touch sense, in)',
       'Expansion header (PB8–PB15)',
+      'Crystal (HSE)',
+      'Boot button (BOOT0, in)',
     ].join('\n'),
   };
 })();
