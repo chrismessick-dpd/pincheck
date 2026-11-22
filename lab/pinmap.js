@@ -26,7 +26,7 @@
   const S = { raw: null, part: null, text: '', map: {}, types: {}, result: null, real: false, view: null };
   function setPart(raw, real) { S.raw = raw; S.part = P.part(raw); S.real = real; S.map = {}; S.types = {}; replan(true); }
   function replan(fresh) {
-    S.result = P.plan(S.part, parseConnects(S.text), S.map, S.types);
+    S.result = P.plan(S.part, parseConnects(S.text), S.map, S.types, { auto: false });   // stored assignments, as in Scribe EE
     $('#pm-part').innerHTML = `<div class="pm-part-name">${esc(S.part.meta.mpn)}</div><div class="pm-part-sub">${esc(S.part.meta.manufacturer || '')} · ${esc(S.part.meta.package || '')} · ${S.part.pads.length} pins${S.real ? ' · <b>opened from disk</b>' : ''}</div>`;
     if (S.view && !fresh) { S.view.update({ part: S.part, result: S.result, map: S.map }); return; }
     if (S.view) S.view.destroy();
@@ -35,6 +35,10 @@
       onView: (v) => store.set('view', v),
       onPick: (pad, fn, req, gpio) => { S.map = P.pick(S.map, S.result, S.part, pad, fn, req, gpio); replan(); },
       onUnpick: (pad) => { S.map = P.unpick(S.map, pad); replan(); },
+      onAuto: () => { S.map = P.assignAll(S.map, P.plan(S.part, parseConnects(S.text), S.map, S.types, { auto: true }), S.part); replan(); },
+      onUnassign: () => { S.map = P.unassign(S.map); replan(); },
+      onLock: (ids, on) => { S.map = P.lock(S.map, ids, on); replan(); },
+      onLockPads: (pads, on) => { S.map = P.lockPads(S.map, pads, on); replan(); },
       onClear: (reqId) => { S.map = Object.fromEntries(Object.entries(S.map).filter(([, l]) => l.req !== reqId)); replan(); },
       onType: (reqId, keys, val) => {
         keys.forEach((k) => { if (val) S.types[k] = val; else delete S.types[k]; });

@@ -186,3 +186,5 @@ other.
 5. `.ioc` export and import after the planner works (Chris).
 6. A connection's type can be set in the pin map over its label (Chris, 2026-11-21: "Sense1_I2C" as I2C), from a list of
    the part's own peripherals; stored as `pins.types` on the MCU block, the label untouched.
+7. Assignments are stored and change only on Auto-assign or a pick; a row's lock freezes its pins, and Unassign
+   skips locked rows (Chris, 2026-11-21).
